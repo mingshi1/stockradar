@@ -1,119 +1,200 @@
-# AI板块事件雷达 v0.4.0
+# AI板块事件雷达 v0.5.0
 
-这是从可运行原型 v0.3 重构出来的第一版工程化结构。
+V0.5 是第一个带本地 SQLite 数据库的版本。
 
-## v0.4 的目标
+## 新增功能
 
-本版本**不追求一次加入很多新功能**，而是把已经跑通的核心能力拆成可以长期维护的模块：
+- 自定义板块临时查询
+- 自定义板块长期保存
+- SQLite 本地数据库
+- 分析历史永久保存
+- 历史报告页面
+- Event Pool 基础
+- 新闻事件基础去重
+- 新闻事件详情页
+- V0.4 的 AIProvider / DeepSeek / Web Search 架构继续保留
 
-- PySide6 桌面 UI
-- DeepSeek API Key 安全保存
-- DeepSeek API 测试
-- DeepSeek Web Search 研究
-- 结构化 JSON 板块分析
-- 后台线程，避免 UI 在 API 请求时卡死
-- HTML 分析报告显示
-- 原始联网研究资料显示在“新闻源”页
-- 为未来 OpenAI / Qwen / GLM / Multi-AI 预留 Provider 接口
+## 自定义板块
 
-## 项目结构
+首页增加：
 
 ```text
-stockradar-v0.4.0/
-├── main.py
-├── requirements.txt
-├── README.md
-├── CHANGELOG.md
-├── VERSION
-└── app/
-    ├── config/
-    │   └── settings.py
-    ├── ai/
-    │   ├── base.py
-    │   ├── manager.py
-    │   └── providers/
-    │       └── deepseek.py
-    ├── analysis/
-    │   ├── models.py
-    │   └── service.py
-    ├── news/
-    │   ├── models.py
-    │   └── service.py
-    ├── report/
-    │   └── html_renderer.py
-    └── ui/
-        ├── main_window.py
-        ├── workers.py
-        ├── styles.py
-        └── pages/
-            ├── dashboard_page.py
-            ├── history_page.py
-            ├── news_page.py
-            ├── sector_page.py
-            └── settings_page.py
+自定义板块
+[ 生物医药                    ] [加入本次分析]
 ```
 
-## 安装依赖
+可以输入：
 
-请确保 VS Code 使用你的正式开发解释器，例如：
+```text
+生物医药
+机器人
+创新药
+光伏
+游戏
+低空经济
+```
+
+临时加入只用于当前程序会话。
+
+如果想长期保存：
+
+```text
+板块管理 → 输入板块 → 保存板块
+```
+
+保存后即使关闭软件、重新启动，也还会存在。
+
+## SQLite 是什么？
+
+SQLite 是嵌入式关系型数据库。
+
+它不需要安装 MySQL、PostgreSQL 之类的数据库服务器，
+也不需要用户名、密码、端口。
+
+Python 自带：
+
+```python
+import sqlite3
+```
+
+本软件数据库默认位于：
+
+```text
+%APPDATA%\StockEventRadar\stockradar.db
+```
+
+源码和数据库彼此分离，因此：
+
+- Git 不会上传你的本地研究记录
+- 更换项目源码不会自动删除历史
+- 后续打包 EXE 时也适合每个用户保存自己的数据
+
+## V0.5 数据表
+
+### analysis_runs
+
+一行 = 一次完整 AI 分析。
+
+保存：
+
+- 分析时间
+- AI Provider
+- 模型
+- 板块列表
+- 整体摘要
+- 完整 JSON 结果
+- 原始联网研究文本
+
+### events
+
+一行 = 一个新闻/事件。
+
+保存：
+
+- 标题
+- 日期
+- 来源
+- URL
+- AI 分析摘要
+- fingerprint
+- 首次看到时间
+- 最近看到时间
+
+### analysis_events
+
+连接：
+
+```text
+某次分析
+    ↕
+某个事件
+```
+
+并记录这个事件当时关联的板块、影响方向和重要度。
+
+### custom_sectors
+
+保存用户自己的板块。
+
+## 事件去重
+
+V0.5 使用基础 fingerprint：
+
+```text
+标题 + 日期 + 来源
+        ↓
+SHA-256
+        ↓
+fingerprint
+```
+
+完全相同的事件不会重复插入 events 表。
+
+注意：这只是 V0.5 的基础去重。
+
+未来会升级成：
+
+```text
+不同标题但其实是同一事件
+↓
+语义聚类 / AI Event Merge
+```
+
+## 安装
+
+继续使用：
 
 ```text
 D:\miniconda3\envs\stockradar-dev\python.exe
 ```
 
-然后在项目目录执行：
+安装依赖：
 
 ```powershell
 python -m pip install -r requirements.txt
 ```
 
-如果你之前已经安装过依赖，也建议执行一次，pip 会自动跳过已经满足的版本。
+本版本没有新增第三方 Python 包。
 
-## 运行
-
-```powershell
-python main.py
-```
-
-## API Key
-
-进入软件：
+SQLite 来自 Python 标准库，不需要：
 
 ```text
-设置 → AI 服务 → API Key
+pip install sqlite
 ```
 
-填入你自己的 DeepSeek API Key，然后：
+## API
 
-1. 保存设置
-2. 测试连接
-3. 回到“今日分析”
-4. 先选择 1~2 个板块测试
+V0.5 不需要新增 API。
 
-API Key 使用 `keyring` 保存到操作系统凭据管理器，不写入项目源码。
+继续使用你之前配置好的 DeepSeek API Key：
 
-v0.3 使用过同一个 `StockEventRadar` keyring 服务名时，原来的 DeepSeek API Key 可以直接复用。
+```text
+设置 → AI 服务
+```
 
-## v0.4 当前边界
+API Key 仍使用 keyring 保存。
 
-暂时没有实现：
+## 推荐测试步骤
 
-- SQLite 历史数据库
-- OpenAI / Qwen / GLM
-- Multi-AI Consensus
-- PDF / PNG 导出
-- 新闻逐条结构化 Event Pool
-- 自动晨报
-- EXE 安装包
+1. 启动软件。
+2. 测试 DeepSeek API。
+3. 首页取消大部分默认板块。
+4. 输入 `生物医药` → 加入本次分析。
+5. 只分析 `黄金 + 生物医药`。
+6. 确认首页出现分析结果。
+7. 打开“历史报告”，确认刚才的分析存在。
+8. 点击该历史记录，确认报告可以恢复。
+9. 打开“新闻源”，确认事件已保存。
+10. 进入“板块管理”，新增 `机器人`。
+11. 关闭软件。
+12. 再次启动，确认 `机器人` 仍然存在。
 
-这些将在后续版本逐步加入。
+## 下一版方向
 
-## 下一版本
+V0.6：
 
-v0.5 计划重点：
-
-- SQLite
-- Event Pool
-- 历史分析记录
-- 新闻事件去重基础
-- 历史报告页真正可用
+- OpenAI Provider
+- 多 AI Provider 设置结构
+- 两模型独立分析基础
+- Consensus Engine 第一版
+- Token / 调用成本记录基础

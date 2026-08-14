@@ -149,4 +149,34 @@ QTextBrowser {
     font-size: 14px;
     padding: 5px;
 }
+
+#dangerButton {
+    background-color: white;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+    border-radius: 7px;
+    padding: 8px 16px;
+    font-size: 14px;
+}
+
+#dangerButton:hover {
+    background-color: #fef2f2;
+}
+
+QListWidget, QTableWidget {
+    background-color: white;
+    border: 1px solid #e1e4e8;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+QListWidget::item {
+    padding: 10px;
+}
+
+QListWidget::item:selected {
+    background-color: #dbeafe;
+    color: #1e3a8a;
+}
+
 """

@@ -6,21 +6,12 @@ import keyring
 
 
 APP_NAME = "StockEventRadar"
-CONFIG_DIR = Path(os.getenv("APPDATA") or Path.home()) / APP_NAME
-CONFIG_FILE = CONFIG_DIR / "settings.json"
+APP_DATA_DIR = Path(os.getenv("APPDATA") or Path.home()) / APP_NAME
+CONFIG_FILE = APP_DATA_DIR / "settings.json"
+DATABASE_FILE = APP_DATA_DIR / "stockradar.db"
 
 
 class AppConfig:
-    """
-    管理非敏感设置与 API Key。
-
-    普通设置：
-        %APPDATA%/StockEventRadar/settings.json
-
-    API Key：
-        操作系统凭据管理器（keyring）
-    """
-
     def __init__(self):
         self.provider = "DeepSeek"
         self.model = "deepseek-v4-flash"
@@ -35,19 +26,19 @@ class AppConfig:
             self.provider = data.get("provider", "DeepSeek")
             self.model = data.get("model", "deepseek-v4-flash")
         except Exception:
-            # 配置文件异常不应该阻止程序启动。
             pass
 
     def save(self):
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-
-        data = {
-            "provider": self.provider,
-            "model": self.model,
-        }
-
+        APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
         CONFIG_FILE.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2),
+            json.dumps(
+                {
+                    "provider": self.provider,
+                    "model": self.model,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
             encoding="utf-8",
         )
 

@@ -125,7 +125,7 @@ class SettingsPage(QWidget):
         info_layout = QVBoxLayout(info_card)
         info_layout.setContentsMargins(30, 20, 30, 20)
 
-        info_title = QLabel("V0.4 Provider 架构")
+        info_title = QLabel("V0.5 数据与 Provider 架构")
         info_title.setObjectName("cardTitle")
 
         info_text = QLabel(

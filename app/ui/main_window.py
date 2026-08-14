@@ -15,6 +15,7 @@ from app.ai.manager import ProviderManager
 from app.analysis.models import AnalysisBundle
 from app.analysis.service import AnalysisService
 from app.config.settings import AppConfig
+from app.database.database import Database
 from app.news.service import NewsService
 from app.report.html_renderer import render_analysis_html
 from app.ui.pages.dashboard_page import DashboardPage
@@ -31,22 +32,27 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.config = AppConfig()
+        self.database = Database()
         self.provider_manager = ProviderManager()
         self.analysis_service = AnalysisService(
             self.provider_manager
         )
-        self.news_service = NewsService()
+        self.news_service = NewsService(
+            self.database
+        )
 
         self.analysis_worker: AnalysisWorker | None = None
         self.connection_worker: ConnectionWorker | None = None
 
         self.setWindowTitle("AI板块事件雷达")
-        self.resize(1200, 760)
-        self.setMinimumSize(950, 600)
+        self.resize(1250, 800)
+        self.setMinimumSize(1000, 650)
 
         self._build_ui()
         self._connect_signals()
         self.setStyleSheet(APP_STYLE)
+
+        self.refresh_database_views()
 
     def _build_ui(self):
         root_widget = QWidget()
@@ -129,7 +135,7 @@ class MainWindow(QMainWindow):
 
         layout.addStretch()
 
-        version = QLabel("v0.4.0")
+        version = QLabel("v0.5.0")
         version.setObjectName("versionLabel")
         layout.addWidget(version)
 
@@ -143,9 +149,19 @@ class MainWindow(QMainWindow):
         self.settings_page.save_requested.connect(
             self.save_settings
         )
-
         self.settings_page.test_requested.connect(
             self.test_api_connection
+        )
+
+        self.sector_page.add_requested.connect(
+            self.add_custom_sector
+        )
+        self.sector_page.delete_requested.connect(
+            self.delete_custom_sector
+        )
+
+        self.history_page.run_selected.connect(
+            self.show_history_run
         )
 
     def switch_page(self, index: int):
@@ -155,6 +171,62 @@ class MainWindow(QMainWindow):
             self.nav_buttons
         ):
             button.setChecked(button_index == index)
+
+        if index in (1, 2, 3):
+            self.refresh_database_views()
+
+    # =========================================================
+    # SQLite-backed views
+    # =========================================================
+
+    def refresh_database_views(self):
+        custom_sectors = self.database.list_custom_sectors()
+
+        self.dashboard_page.set_saved_custom_sectors(
+            custom_sectors
+        )
+        self.sector_page.set_sectors(
+            custom_sectors
+        )
+
+        self.history_page.set_runs(
+            self.database.list_analysis_runs()
+        )
+
+        self.news_page.set_events(
+            self.news_service.list_events()
+        )
+
+    def add_custom_sector(self, name: str):
+        added = self.database.add_custom_sector(name)
+
+        if not added:
+            QMessageBox.information(
+                self,
+                "未新增",
+                "该板块已经存在，或名称为空。",
+            )
+            return
+
+        self.sector_page.add_success()
+        self.refresh_database_views()
+
+    def delete_custom_sector(self, name: str):
+        answer = QMessageBox.question(
+            self,
+            "确认删除",
+            f"确定删除自定义板块“{name}”吗？",
+        )
+
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        self.database.delete_custom_sector(name)
+        self.refresh_database_views()
+
+    # =========================================================
+    # Analysis
+    # =========================================================
 
     def start_analysis(self, selected_sectors: list[str]):
         if not selected_sectors:
@@ -208,17 +280,24 @@ class MainWindow(QMainWindow):
         self.analysis_worker.start()
 
     def on_analysis_ready(self, bundle: AnalysisBundle):
-        self.news_service.update_from_analysis(bundle)
-
-        snapshot = self.news_service.latest_snapshot()
-
-        if snapshot is not None:
-            self.news_page.set_snapshot(snapshot)
+        try:
+            self.database.save_analysis(bundle)
+        except Exception as exc:
+            QMessageBox.warning(
+                self,
+                "数据库保存失败",
+                "分析已经成功，但写入 SQLite 失败：\n\n"
+                f"{exc}",
+            )
 
         html_content = render_analysis_html(
             bundle.structured
         )
-        self.dashboard_page.show_result(html_content)
+        self.dashboard_page.show_result(
+            html_content
+        )
+
+        self.refresh_database_views()
 
     def on_analysis_error(self, message: str):
         self.dashboard_page.show_error(message)
@@ -232,6 +311,26 @@ class MainWindow(QMainWindow):
     def on_analysis_finished(self):
         self.dashboard_page.set_running(False)
         self.analysis_worker = None
+
+    # =========================================================
+    # History
+    # =========================================================
+
+    def show_history_run(self, run_id: int):
+        run = self.database.get_analysis_run(run_id)
+
+        if not run:
+            return
+
+        self.history_page.show_report(
+            render_analysis_html(
+                run["result"]
+            )
+        )
+
+    # =========================================================
+    # Settings
+    # =========================================================
 
     def save_settings(
         self,
