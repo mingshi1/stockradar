@@ -19,21 +19,21 @@ class ReportPage(QWidget):
     )
     export_requested = Signal(str)
     copy_requested = Signal()
+    saved_report_requested = Signal(int)
 
     def __init__(self):
         super().__init__()
-
         self._build_ui()
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(
-            45,
-            30,
-            45,
-            30,
+            40,
+            25,
+            40,
+            25,
         )
-        layout.setSpacing(15)
+        layout.setSpacing(12)
 
         title = QLabel(
             "晨报与报告中心"
@@ -43,8 +43,7 @@ class ReportPage(QWidget):
         )
 
         description = QLabel(
-            "从 SQLite 历史分析生成晨报、标准报告、"
-            "Multi-AI 共识报告或深度研究报告，并可导出文件。"
+            "V0.8 生成预览时会自动归档到 SQLite；同一分析记录 + 同一报告类型会更新，不会无限重复。"
         )
         description.setWordWrap(True)
         description.setObjectName(
@@ -61,15 +60,15 @@ class ReportPage(QWidget):
             control_card
         )
         control_layout.setContentsMargins(
-            25,
-            18,
-            25,
-            18,
+            22,
+            15,
+            22,
+            15,
         )
-        control_layout.setSpacing(12)
+        control_layout.setSpacing(10)
 
         control_title = QLabel(
-            "报告生成"
+            "生成报告"
         )
         control_title.setObjectName(
             "cardTitle"
@@ -111,14 +110,13 @@ class ReportPage(QWidget):
             "深度研究报告",
             "deep",
         )
-
         first_row.addWidget(
             self.type_combo,
             1,
         )
 
         generate_button = QPushButton(
-            "生成预览"
+            "生成并归档"
         )
         generate_button.setObjectName(
             "primaryButton"
@@ -126,7 +124,6 @@ class ReportPage(QWidget):
         generate_button.clicked.connect(
             self._generate
         )
-
         first_row.addWidget(
             generate_button
         )
@@ -137,13 +134,28 @@ class ReportPage(QWidget):
 
         second_row = QHBoxLayout()
 
-        hint = QLabel(
-            "晨报基于已保存的分析结果本地生成，不额外调用 AI。"
+        second_row.addWidget(
+            QLabel("已归档")
         )
-        hint.setObjectName(
-            "statusLabel"
+
+        self.archive_combo = QComboBox()
+        second_row.addWidget(
+            self.archive_combo,
+            2,
         )
-        second_row.addWidget(hint)
+
+        open_archive_button = QPushButton(
+            "打开归档"
+        )
+        open_archive_button.setObjectName(
+            "secondaryButton"
+        )
+        open_archive_button.clicked.connect(
+            self._open_archive
+        )
+        second_row.addWidget(
+            open_archive_button
+        )
 
         second_row.addStretch()
 
@@ -166,9 +178,7 @@ class ReportPage(QWidget):
             ("PDF", "pdf"),
             ("PNG长图", "png"),
         ]:
-            button = QPushButton(
-                text
-            )
+            button = QPushButton(text)
             button.setObjectName(
                 "secondaryButton"
             )
@@ -177,12 +187,20 @@ class ReportPage(QWidget):
                 f=fmt:
                 self.export_requested.emit(f)
             )
-            second_row.addWidget(
-                button
-            )
+            second_row.addWidget(button)
 
         control_layout.addLayout(
             second_row
+        )
+
+        hint = QLabel(
+            "30秒晨报和报告归档均基于已有分析结果本地生成，不额外调用 AI。"
+        )
+        hint.setObjectName(
+            "statusLabel"
+        )
+        control_layout.addWidget(
+            hint
         )
 
         layout.addWidget(
@@ -198,10 +216,10 @@ class ReportPage(QWidget):
             preview_card
         )
         preview_layout.setContentsMargins(
-            22,
-            18,
-            22,
-            18,
+            20,
+            14,
+            20,
+            14,
         )
 
         self.preview_title = QLabel(
@@ -219,9 +237,8 @@ class ReportPage(QWidget):
             True
         )
         self.browser.setPlaceholderText(
-            "选择历史分析后点击“生成预览”。"
+            "选择历史分析后点击“生成并归档”，或打开已有归档。"
         )
-
         preview_layout.addWidget(
             self.browser
         )
@@ -284,10 +301,8 @@ class ReportPage(QWidget):
             )
 
         if current_id is not None:
-            index = (
-                self.run_combo.findData(
-                    current_id
-                )
+            index = self.run_combo.findData(
+                current_id
             )
 
             if index >= 0:
@@ -299,10 +314,54 @@ class ReportPage(QWidget):
             False
         )
 
-    def _generate(self):
-        run_id = (
-            self.run_combo.currentData()
+    def set_saved_reports(
+        self,
+        reports: list[dict],
+    ):
+        current_id = (
+            self.archive_combo.currentData()
+            if self.archive_combo.count()
+            else None
         )
+
+        self.archive_combo.blockSignals(
+            True
+        )
+        self.archive_combo.clear()
+
+        for report in reports:
+            updated = str(
+                report.get(
+                    "updated_at",
+                    "",
+                )
+            ).replace(
+                "T",
+                " ",
+            )[:16]
+
+            self.archive_combo.addItem(
+                f"{updated} ｜ "
+                f"{report.get('title', '')}",
+                int(report["id"]),
+            )
+
+        if current_id is not None:
+            index = self.archive_combo.findData(
+                current_id
+            )
+
+            if index >= 0:
+                self.archive_combo.setCurrentIndex(
+                    index
+                )
+
+        self.archive_combo.blockSignals(
+            False
+        )
+
+    def _generate(self):
+        run_id = self.run_combo.currentData()
 
         if run_id is None:
             QMessageBox.information(
@@ -312,13 +371,29 @@ class ReportPage(QWidget):
             )
             return
 
-        report_type = (
-            self.type_combo.currentData()
-        )
-
         self.generate_requested.emit(
             int(run_id),
-            str(report_type),
+            str(
+                self.type_combo.currentData()
+            ),
+        )
+
+    def _open_archive(self):
+        report_id = (
+            self.archive_combo
+            .currentData()
+        )
+
+        if report_id is None:
+            QMessageBox.information(
+                self,
+                "没有归档报告",
+                "请先生成并归档一份报告。",
+            )
+            return
+
+        self.saved_report_requested.emit(
+            int(report_id)
         )
 
     def show_artifact(

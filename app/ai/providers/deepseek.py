@@ -1,4 +1,8 @@
-from app.ai.base import AIProvider, ProviderInfo
+from app.ai.base import (
+    AIProvider,
+    ProviderInfo,
+    TextCallResult,
+)
 
 
 class DeepSeekProvider(AIProvider):
@@ -20,7 +24,7 @@ class DeepSeekProvider(AIProvider):
         base_url: str | None,
         prompt: str,
         instructions: str,
-    ) -> str:
+    ) -> TextCallResult:
         client = self.build_client(
             api_key=api_key,
             base_url=base_url,
@@ -46,4 +50,7 @@ class DeepSeekProvider(AIProvider):
                 "DeepSeek 联网搜索没有返回有效内容。"
             )
 
-        return text
+        return TextCallResult(
+            text=text,
+            usage=self._extract_usage(response),
+        )

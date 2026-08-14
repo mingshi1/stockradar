@@ -2,7 +2,9 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDoubleSpinBox,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -34,10 +36,7 @@ class SettingsPage(QWidget):
 
         self.config = config
         self.provider_manager = provider_manager
-        self.provider_widgets: dict[
-            str,
-            dict,
-        ] = {}
+        self.provider_widgets: dict[str, dict] = {}
 
         self._build_ui()
         self._load_config()
@@ -45,19 +44,23 @@ class SettingsPage(QWidget):
     def _build_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(
-            45,
-            30,
-            45,
-            30,
+            40,
+            25,
+            40,
+            25,
         )
-        layout.setSpacing(15)
+        layout.setSpacing(12)
 
-        title = QLabel("AI 模型与验证设置")
-        title.setObjectName("pageTitle")
+        title = QLabel(
+            "AI 模型与成本设置"
+        )
+        title.setObjectName(
+            "pageTitle"
+        )
 
         description = QLabel(
-            "V0.6 支持 DeepSeek、OpenAI、Qwen、GLM、Kimi。"
-            "多个模型会读取同一份联网证据后独立判断。"
+            "配置国产 Multi-AI、联网研究 Provider，以及可选的 Token 单价。"
+            "单价完全由你维护，软件不会把可能过期的官方价格硬编码进去。"
         )
         description.setWordWrap(True)
         description.setObjectName(
@@ -68,7 +71,7 @@ class SettingsPage(QWidget):
         layout.addWidget(description)
 
         # =====================================================
-        # Multi-AI global settings
+        # Global flow
         # =====================================================
         global_card = QFrame()
         global_card.setObjectName("card")
@@ -77,12 +80,12 @@ class SettingsPage(QWidget):
             global_card
         )
         global_layout.setContentsMargins(
-            25,
-            20,
-            25,
-            20,
+            22,
+            15,
+            22,
+            15,
         )
-        global_layout.setSpacing(10)
+        global_layout.setSpacing(8)
 
         global_title = QLabel(
             "分析流程"
@@ -94,29 +97,24 @@ class SettingsPage(QWidget):
             global_title
         )
 
-        research_row = QHBoxLayout()
+        row = QHBoxLayout()
 
-        research_row.addWidget(
+        row.addWidget(
             QLabel("联网研究 Provider")
         )
-
-        self.research_combo = (
-            QComboBox()
-        )
+        self.research_combo = QComboBox()
         self.research_combo.addItems(
             self.provider_manager
             .research_provider_names()
         )
-
-        research_row.addWidget(
+        row.addWidget(
             self.research_combo,
             1,
         )
 
-        research_row.addWidget(
+        row.addWidget(
             QLabel("分析模式")
         )
-
         self.mode_combo = QComboBox()
         self.mode_combo.addItem(
             "单模型快速",
@@ -126,36 +124,27 @@ class SettingsPage(QWidget):
             "多模型交叉验证",
             "multi",
         )
-
-        research_row.addWidget(
+        row.addWidget(
             self.mode_combo,
             1,
         )
 
-        global_layout.addLayout(
-            research_row
-        )
+        global_layout.addLayout(row)
 
         judge_row = QHBoxLayout()
 
-        self.judge_checkbox = (
-            QCheckBox(
-                "启用 Judge AI 汇总共识与分歧"
-            )
+        self.judge_checkbox = QCheckBox(
+            "启用 Judge AI 总结共识与分歧"
         )
         judge_row.addWidget(
             self.judge_checkbox
         )
-
         judge_row.addStretch()
-
         judge_row.addWidget(
             QLabel("Judge Provider")
         )
 
-        self.judge_combo = (
-            QComboBox()
-        )
+        self.judge_combo = QComboBox()
         self.judge_combo.addItems(
             self.provider_manager
             .provider_names()
@@ -169,15 +158,20 @@ class SettingsPage(QWidget):
         )
 
         hint = QLabel(
-            "建议：日常先用 2~3 个模型。"
-            "Judge 会额外增加一次 API 调用；"
-            "它只总结分歧，不修改数学聚合得到的评分。"
+            "日常建议启用 2~3 个模型。V0.8 会记录每次 Provider 耗时和 Token；"
+            "价格字段留空/0 时仍记录 Token，但不估算成本。"
         )
         hint.setWordWrap(True)
-        hint.setObjectName("statusLabel")
-        global_layout.addWidget(hint)
+        hint.setObjectName(
+            "statusLabel"
+        )
+        global_layout.addWidget(
+            hint
+        )
 
-        layout.addWidget(global_card)
+        layout.addWidget(
+            global_card
+        )
 
         # =====================================================
         # Provider tabs
@@ -213,9 +207,13 @@ class SettingsPage(QWidget):
         save_button.clicked.connect(
             self._emit_save
         )
+        save_row.addWidget(
+            save_button
+        )
 
-        save_row.addWidget(save_button)
-        layout.addLayout(save_row)
+        layout.addLayout(
+            save_row
+        )
 
     def _create_provider_tab(
         self,
@@ -226,15 +224,14 @@ class SettingsPage(QWidget):
         )
 
         tab = QWidget()
-
         layout = QVBoxLayout(tab)
         layout.setContentsMargins(
-            20,
-            20,
-            20,
-            20,
+            18,
+            16,
+            18,
+            16,
         )
-        layout.setSpacing(12)
+        layout.setSpacing(10)
 
         enabled = QCheckBox(
             "参与多模型独立分析"
@@ -246,36 +243,125 @@ class SettingsPage(QWidget):
                 "（也可作为联网研究 Provider）"
             )
 
-        layout.addWidget(enabled)
+        layout.addWidget(
+            enabled
+        )
 
-        model_label = QLabel("模型")
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(14)
+        grid.setVerticalSpacing(8)
+
         model_combo = QComboBox()
         model_combo.setEditable(True)
         model_combo.addItems(
             list(info.models)
         )
 
-        layout.addWidget(model_label)
-        layout.addWidget(model_combo)
-
-        base_label = QLabel("Base URL")
         base_input = QLineEdit()
 
-        layout.addWidget(base_label)
-        layout.addWidget(base_input)
-
-        api_label = QLabel("API Key")
         api_input = QLineEdit()
         api_input.setEchoMode(
             QLineEdit.EchoMode.Password
         )
 
-        layout.addWidget(api_label)
-        layout.addWidget(api_input)
+        input_price = QDoubleSpinBox()
+        input_price.setRange(
+            0.0,
+            1_000_000.0,
+        )
+        input_price.setDecimals(6)
+        input_price.setSingleStep(0.1)
+        input_price.setSuffix(
+            " / 1M input tokens"
+        )
 
-        status = QLabel("尚未测试连接")
-        status.setObjectName("statusLabel")
-        layout.addWidget(status)
+        output_price = QDoubleSpinBox()
+        output_price.setRange(
+            0.0,
+            1_000_000.0,
+        )
+        output_price.setDecimals(6)
+        output_price.setSingleStep(0.1)
+        output_price.setSuffix(
+            " / 1M output tokens"
+        )
+
+        grid.addWidget(
+            QLabel("模型"),
+            0,
+            0,
+        )
+        grid.addWidget(
+            model_combo,
+            0,
+            1,
+        )
+        grid.addWidget(
+            QLabel("Base URL"),
+            1,
+            0,
+        )
+        grid.addWidget(
+            base_input,
+            1,
+            1,
+        )
+        grid.addWidget(
+            QLabel("API Key"),
+            2,
+            0,
+        )
+        grid.addWidget(
+            api_input,
+            2,
+            1,
+        )
+        grid.addWidget(
+            QLabel("输入单价*"),
+            3,
+            0,
+        )
+        grid.addWidget(
+            input_price,
+            3,
+            1,
+        )
+        grid.addWidget(
+            QLabel("输出单价*"),
+            4,
+            0,
+        )
+        grid.addWidget(
+            output_price,
+            4,
+            1,
+        )
+
+        layout.addLayout(
+            grid
+        )
+
+        price_hint = QLabel(
+            "* 单价货币单位由你自己保持一致，例如全部使用人民币。"
+            "填写 0 表示“不估算此 Provider 成本”。"
+        )
+        price_hint.setWordWrap(True)
+        price_hint.setObjectName(
+            "statusLabel"
+        )
+        layout.addWidget(
+            price_hint
+        )
+
+        status = QLabel(
+            "尚未测试连接"
+        )
+        status.setObjectName(
+            "statusLabel"
+        )
+        layout.addWidget(
+            status
+        )
 
         button_row = QHBoxLayout()
         button_row.addStretch()
@@ -287,46 +373,33 @@ class SettingsPage(QWidget):
             "secondaryButton"
         )
         test_button.clicked.connect(
-            lambda checked=False, name=provider_name:
+            lambda checked=False,
+            name=provider_name:
             self._emit_test(name)
         )
 
-        button_row.addWidget(test_button)
-        layout.addLayout(button_row)
+        button_row.addWidget(
+            test_button
+        )
+        layout.addLayout(
+            button_row
+        )
 
-        if provider_name == "Qwen":
-            qwen_hint = QLabel(
-                "千问提示：不同地域/计费模式的 API Host "
-                "可能不同。如果控制台给你的 API Host "
-                "与默认值不同，请把 Base URL 改成控制台显示的地址。"
+        specific_hint = self._provider_hint(
+            provider_name
+        )
+
+        if specific_hint:
+            label = QLabel(
+                specific_hint
             )
-            qwen_hint.setWordWrap(True)
-            qwen_hint.setObjectName(
+            label.setWordWrap(True)
+            label.setObjectName(
                 "statusLabel"
             )
-            layout.addWidget(qwen_hint)
-
-        if provider_name == "Doubao":
-            doubao_hint = QLabel(
-                "豆包提示：模型输入框可编辑。建议优先复制火山方舟控制台"
-                "“API 接入”页面显示的准确 Model ID。豆包也可以作为联网研究 Provider。"
+            layout.addWidget(
+                label
             )
-            doubao_hint.setWordWrap(True)
-            doubao_hint.setObjectName(
-                "statusLabel"
-            )
-            layout.addWidget(doubao_hint)
-
-        if provider_name == "MiniMax":
-            minimax_hint = QLabel(
-                "MiniMax 使用中国开放平台地址 api.minimaxi.com。"
-                "V0.7 默认 MiniMax-M2.7，模型输入框同样可自行修改。"
-            )
-            minimax_hint.setWordWrap(True)
-            minimax_hint.setObjectName(
-                "statusLabel"
-            )
-            layout.addWidget(minimax_hint)
 
         layout.addStretch()
 
@@ -337,21 +410,44 @@ class SettingsPage(QWidget):
             "model": model_combo,
             "base_url": base_input,
             "api_key": api_input,
+            "input_price": input_price,
+            "output_price": output_price,
             "status": status,
             "test_button": test_button,
         }
 
         return tab
 
+    @staticmethod
+    def _provider_hint(
+        provider_name: str,
+    ) -> str:
+        hints = {
+            "Qwen": (
+                "千问不同地域/计费模式的 API Host 可能不同；"
+                "控制台地址优先于软件默认值。"
+            ),
+            "Doubao": (
+                "豆包模型更新较快，建议复制火山方舟控制台“API 接入”"
+                "页面显示的准确 Model ID。"
+            ),
+            "MiniMax": (
+                "MiniMax 默认使用中国开放平台 api.minimaxi.com。"
+            ),
+        }
+
+        return hints.get(
+            provider_name,
+            "",
+        )
+
     def _load_config(self):
         self.research_combo.setCurrentText(
             self.config.research_provider
         )
 
-        mode_index = (
-            self.mode_combo.findData(
-                self.config.analysis_mode
-            )
+        mode_index = self.mode_combo.findData(
+            self.config.analysis_mode
         )
 
         if mode_index >= 0:
@@ -369,21 +465,14 @@ class SettingsPage(QWidget):
         for provider_name, widgets in (
             self.provider_widgets.items()
         ):
-            info = (
-                self.provider_manager.info(
-                    provider_name
-                )
+            info = self.provider_manager.info(
+                provider_name
             )
-            saved = (
-                self.config
-                .get_provider_config(
-                    provider_name
-                )
+            saved = self.config.get_provider_config(
+                provider_name
             )
 
-            widgets[
-                "enabled"
-            ].setChecked(
+            widgets["enabled"].setChecked(
                 bool(
                     saved.get(
                         "enabled",
@@ -391,24 +480,38 @@ class SettingsPage(QWidget):
                     )
                 )
             )
-
-            model = saved.get(
-                "model",
-                info.default_model,
+            widgets["model"].setCurrentText(
+                str(
+                    saved.get(
+                        "model",
+                        info.default_model,
+                    )
+                )
             )
-
-            widgets[
-                "model"
-            ].setCurrentText(
-                model
+            widgets["base_url"].setText(
+                str(
+                    saved.get(
+                        "base_url",
+                        info.default_base_url,
+                    )
+                )
             )
-
-            widgets[
-                "base_url"
-            ].setText(
-                saved.get(
-                    "base_url",
-                    info.default_base_url,
+            widgets["input_price"].setValue(
+                float(
+                    saved.get(
+                        "input_price_per_million",
+                        0.0,
+                    )
+                    or 0.0
+                )
+            )
+            widgets["output_price"].setValue(
+                float(
+                    saved.get(
+                        "output_price_per_million",
+                        0.0,
+                    )
+                    or 0.0
                 )
             )
 
@@ -428,7 +531,7 @@ class SettingsPage(QWidget):
             provider_name
         ):
             widget.setPlaceholderText(
-                "API Key 已安全保存；留空表示继续使用原 Key"
+                "API Key 已安全保存；留空继续使用原 Key"
             )
         else:
             widget.setPlaceholderText(
@@ -445,24 +548,31 @@ class SettingsPage(QWidget):
                 provider_name
             ] = {
                 "enabled": (
-                    widgets[
-                        "enabled"
-                    ].isChecked()
+                    widgets["enabled"]
+                    .isChecked()
                 ),
                 "model": (
-                    widgets[
-                        "model"
-                    ].currentText().strip()
+                    widgets["model"]
+                    .currentText()
+                    .strip()
                 ),
                 "base_url": (
-                    widgets[
-                        "base_url"
-                    ].text().strip()
+                    widgets["base_url"]
+                    .text()
+                    .strip()
                 ),
                 "api_key": (
-                    widgets[
-                        "api_key"
-                    ].text().strip()
+                    widgets["api_key"]
+                    .text()
+                    .strip()
+                ),
+                "input_price_per_million": (
+                    widgets["input_price"]
+                    .value()
+                ),
+                "output_price_per_million": (
+                    widgets["output_price"]
+                    .value()
                 ),
             }
 
@@ -501,24 +611,22 @@ class SettingsPage(QWidget):
 
         self.test_requested.emit(
             provider_name,
-            widgets[
-                "api_key"
-            ].text().strip(),
-            widgets[
-                "model"
-            ].currentText().strip(),
-            widgets[
-                "base_url"
-            ].text().strip(),
+            widgets["api_key"]
+            .text()
+            .strip(),
+            widgets["model"]
+            .currentText()
+            .strip(),
+            widgets["base_url"]
+            .text()
+            .strip(),
         )
 
     def mark_saved(self):
         for provider_name, widgets in (
             self.provider_widgets.items()
         ):
-            widgets[
-                "api_key"
-            ].clear()
+            widgets["api_key"].clear()
             self._refresh_key_placeholder(
                 provider_name
             )
@@ -531,6 +639,7 @@ class SettingsPage(QWidget):
         widgets = self.provider_widgets[
             provider_name
         ]
+
         button = widgets[
             "test_button"
         ]
@@ -545,9 +654,7 @@ class SettingsPage(QWidget):
         )
 
         if running:
-            widgets[
-                "status"
-            ].setText(
+            widgets["status"].setText(
                 "正在连接..."
             )
 

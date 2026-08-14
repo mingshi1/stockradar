@@ -1,14 +1,11 @@
-from app.ai.base import AIProvider, ProviderInfo
+from app.ai.base import (
+    AIProvider,
+    ProviderInfo,
+    TextCallResult,
+)
 
 
 class DoubaoProvider(AIProvider):
-    """
-    火山方舟 / 豆包。
-
-    Base URL 使用火山方舟 OpenAI SDK 兼容地址。
-    model 输入框保持可编辑，以便用户直接使用方舟控制台给出的准确 Model ID。
-    """
-
     info = ProviderInfo(
         name="Doubao",
         default_base_url="https://ark.cn-beijing.volces.com/api/v3",
@@ -29,7 +26,7 @@ class DoubaoProvider(AIProvider):
         base_url: str | None,
         prompt: str,
         instructions: str,
-    ) -> str:
+    ) -> TextCallResult:
         client = self.build_client(
             api_key=api_key,
             base_url=base_url,
@@ -62,4 +59,7 @@ class DoubaoProvider(AIProvider):
                 "豆包联网搜索没有返回有效内容。"
             )
 
-        return text
+        return TextCallResult(
+            text=text,
+            usage=self._extract_usage(response),
+        )

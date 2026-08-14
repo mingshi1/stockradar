@@ -7,11 +7,10 @@ from pathlib import Path
 
 from app.analysis.models import AnalysisBundle
 from app.config.settings import APP_DATA_DIR, DATABASE_FILE
+from app.report.models import ReportArtifact
 
 
 class Database:
-    """SQLite 数据访问层。整个数据库就是一个本地 .db 文件。"""
-
     def __init__(self, db_path: Path = DATABASE_FILE):
         self.db_path = Path(db_path)
         APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -22,6 +21,7 @@ class Database:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
+
         try:
             yield conn
             conn.commit()
@@ -89,25 +89,79 @@ class Database:
                         REFERENCES analysis_runs(id) ON DELETE CASCADE
                 );
 
-                CREATE INDEX IF NOT EXISTS idx_provider_results_run
-                ON provider_results(analysis_run_id);
+                CREATE TABLE IF NOT EXISTS provider_calls (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    analysis_run_id INTEGER NOT NULL,
+                    phase TEXT NOT NULL,
+                    provider TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    duration_ms INTEGER NOT NULL DEFAULT 0,
+                    input_tokens INTEGER NOT NULL DEFAULT 0,
+                    output_tokens INTEGER NOT NULL DEFAULT 0,
+                    total_tokens INTEGER NOT NULL DEFAULT 0,
+                    estimated_cost REAL,
+                    error TEXT,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (analysis_run_id)
+                        REFERENCES analysis_runs(id) ON DELETE CASCADE
+                );
+
+                CREATE TABLE IF NOT EXISTS saved_reports (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    analysis_run_id INTEGER NOT NULL,
+                    report_type TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    html_content TEXT NOT NULL,
+                    markdown_content TEXT NOT NULL,
+                    plain_summary TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(analysis_run_id, report_type),
+                    FOREIGN KEY (analysis_run_id)
+                        REFERENCES analysis_runs(id) ON DELETE CASCADE
+                );
 
                 CREATE INDEX IF NOT EXISTS idx_runs_created
                 ON analysis_runs(created_at DESC);
 
                 CREATE INDEX IF NOT EXISTS idx_events_seen
                 ON events(last_seen_at DESC);
+
+                CREATE INDEX IF NOT EXISTS idx_provider_results_run
+                ON provider_results(analysis_run_id);
+
+                CREATE INDEX IF NOT EXISTS idx_provider_calls_run
+                ON provider_calls(analysis_run_id);
+
+                CREATE INDEX IF NOT EXISTS idx_provider_calls_provider
+                ON provider_calls(provider, phase, status);
+
+                CREATE INDEX IF NOT EXISTS idx_reports_run
+                ON saved_reports(analysis_run_id);
             """)
+
+    # =========================================================
+    # Custom sectors
+    # =========================================================
 
     def add_custom_sector(self, name: str) -> bool:
         name = " ".join(name.strip().split())
+
         if not name:
             return False
+
         try:
             with self.connect() as conn:
                 conn.execute(
-                    "INSERT INTO custom_sectors(name, created_at) VALUES (?, ?)",
-                    (name, datetime.now().isoformat(timespec="seconds")),
+                    """
+                    INSERT INTO custom_sectors(name, created_at)
+                    VALUES (?, ?)
+                    """,
+                    (
+                        name,
+                        datetime.now().isoformat(timespec="seconds"),
+                    ),
                 )
             return True
         except sqlite3.IntegrityError:
@@ -125,18 +179,29 @@ class Database:
             rows = conn.execute(
                 "SELECT name FROM custom_sectors ORDER BY id"
             ).fetchall()
+
         return [row["name"] for row in rows]
 
+    # =========================================================
+    # Analysis history
+    # =========================================================
+
     def save_analysis(self, bundle: AnalysisBundle) -> int:
-        created_at = bundle.generated_at.isoformat(timespec="seconds")
-        result_json = json.dumps(bundle.structured, ensure_ascii=False)
+        created_at = bundle.generated_at.isoformat(
+            timespec="seconds"
+        )
 
         with self.connect() as conn:
             cursor = conn.execute(
                 """
                 INSERT INTO analysis_runs(
-                    created_at, provider, model, sectors_json,
-                    market_summary, result_json, research_text
+                    created_at,
+                    provider,
+                    model,
+                    sectors_json,
+                    market_summary,
+                    result_json,
+                    research_text
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
@@ -144,15 +209,39 @@ class Database:
                     created_at,
                     bundle.provider,
                     bundle.model,
-                    json.dumps(bundle.sectors, ensure_ascii=False),
-                    str(bundle.structured.get("market_summary", "")),
-                    result_json,
+                    json.dumps(
+                        bundle.sectors,
+                        ensure_ascii=False,
+                    ),
+                    str(
+                        bundle.structured.get(
+                            "market_summary",
+                            "",
+                        )
+                    ),
+                    json.dumps(
+                        bundle.structured,
+                        ensure_ascii=False,
+                    ),
                     bundle.research_text,
                 ),
             )
+
             run_id = int(cursor.lastrowid)
-            self._save_events(conn, run_id, bundle, created_at)
+
+            self._save_events(
+                conn,
+                run_id,
+                bundle,
+                created_at,
+            )
             self._save_provider_results(
+                conn,
+                run_id,
+                bundle,
+                created_at,
+            )
+            self._save_provider_calls(
                 conn,
                 run_id,
                 bundle,
@@ -186,13 +275,19 @@ class Database:
             ).fetchall()
 
         result = []
+
         for row in rows:
             item = dict(row)
+
             try:
-                item["sectors"] = json.loads(item.pop("sectors_json"))
+                item["sectors"] = json.loads(
+                    item.pop("sectors_json")
+                )
             except Exception:
                 item["sectors"] = []
+
             result.append(item)
+
         return result
 
     def get_analysis_run(self, run_id: int) -> dict | None:
@@ -206,8 +301,14 @@ class Database:
             return None
 
         item = dict(row)
-        item["sectors"] = json.loads(item.pop("sectors_json"))
-        item["result"] = json.loads(item.pop("result_json"))
+
+        item["sectors"] = json.loads(
+            item.pop("sectors_json")
+        )
+        item["result"] = json.loads(
+            item.pop("result_json")
+        )
+
         return item
 
     def get_provider_results(
@@ -217,7 +318,12 @@ class Database:
         with self.connect() as conn:
             rows = conn.execute(
                 """
-                SELECT provider, model, result_json, error, created_at
+                SELECT
+                    provider,
+                    model,
+                    result_json,
+                    error,
+                    created_at
                 FROM provider_results
                 WHERE analysis_run_id = ?
                 ORDER BY id
@@ -245,18 +351,222 @@ class Database:
 
         return result
 
+    def get_provider_calls(
+        self,
+        run_id: int,
+    ) -> list[dict]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM provider_calls
+                WHERE analysis_run_id = ?
+                ORDER BY id
+                """,
+                (run_id,),
+            ).fetchall()
+
+        return [dict(row) for row in rows]
+
+    # =========================================================
+    # Provider statistics
+    # =========================================================
+
+    def list_provider_stats(self) -> list[dict]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    provider,
+                    COUNT(*) AS call_count,
+                    SUM(
+                        CASE
+                            WHEN status = 'success' THEN 1
+                            ELSE 0
+                        END
+                    ) AS success_count,
+                    AVG(
+                        CASE
+                            WHEN status = 'success' THEN duration_ms
+                            ELSE NULL
+                        END
+                    ) AS avg_duration_ms,
+                    SUM(input_tokens) AS input_tokens,
+                    SUM(output_tokens) AS output_tokens,
+                    SUM(total_tokens) AS total_tokens,
+                    SUM(
+                        CASE
+                            WHEN estimated_cost IS NOT NULL
+                            THEN estimated_cost
+                            ELSE 0
+                        END
+                    ) AS estimated_cost,
+                    SUM(
+                        CASE
+                            WHEN estimated_cost IS NOT NULL
+                            THEN 1
+                            ELSE 0
+                        END
+                    ) AS priced_call_count
+                FROM provider_calls
+                WHERE phase IN ('research', 'analysis', 'judge')
+                GROUP BY provider
+                ORDER BY call_count DESC, provider
+                """
+            ).fetchall()
+
+        return [dict(row) for row in rows]
+
+    # =========================================================
+    # Sector trend
+    # =========================================================
+
+    def list_sector_names(self) -> list[str]:
+        names = set(
+            self.list_custom_sectors()
+        )
+
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT result_json
+                FROM analysis_runs
+                ORDER BY id DESC
+                LIMIT 500
+                """
+            ).fetchall()
+
+        for row in rows:
+            try:
+                data = json.loads(
+                    row["result_json"]
+                )
+            except Exception:
+                continue
+
+            for sector in data.get(
+                "sectors",
+                [],
+            ):
+                name = str(
+                    sector.get(
+                        "sector",
+                        "",
+                    )
+                ).strip()
+
+                if name:
+                    names.add(name)
+
+        return sorted(names)
+
+    def list_sector_trends(
+        self,
+        sector_name: str,
+        limit: int = 30,
+    ) -> list[dict]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    id,
+                    created_at,
+                    result_json
+                FROM analysis_runs
+                ORDER BY id DESC
+                LIMIT 500
+                """
+            ).fetchall()
+
+        target = sector_name.strip().lower()
+        result = []
+
+        for row in rows:
+            try:
+                data = json.loads(
+                    row["result_json"]
+                )
+            except Exception:
+                continue
+
+            match = None
+
+            for sector in data.get(
+                "sectors",
+                [],
+            ):
+                name = str(
+                    sector.get(
+                        "sector",
+                        "",
+                    )
+                ).strip()
+
+                if name.lower() == target:
+                    match = sector
+                    break
+
+            if match is None:
+                continue
+
+            result.append(
+                {
+                    "run_id": row["id"],
+                    "created_at": row["created_at"],
+                    "score": self._safe_float(
+                        match.get("score", 0)
+                    ),
+                    "agreement": self._safe_float(
+                        match.get("agreement", 0)
+                    ),
+                    "confidence": self._safe_float(
+                        match.get("confidence", 0)
+                    ),
+                    "direction": str(
+                        match.get(
+                            "direction",
+                            "",
+                        )
+                    ),
+                    "event_count": len(
+                        match.get(
+                            "events",
+                            [],
+                        )
+                    ),
+                }
+            )
+
+            if len(result) >= limit:
+                break
+
+        result.reverse()
+        return result
+
+    # =========================================================
+    # Event Pool
+    # =========================================================
+
     def list_events(self, limit: int = 300) -> list[dict]:
         with self.connect() as conn:
             rows = conn.execute(
                 """
-                SELECT id, title, event_date, source, url, analysis,
-                       first_seen_at, last_seen_at
+                SELECT
+                    id,
+                    title,
+                    event_date,
+                    source,
+                    url,
+                    analysis,
+                    first_seen_at,
+                    last_seen_at
                 FROM events
                 ORDER BY last_seen_at DESC, id DESC
                 LIMIT ?
                 """,
                 (limit,),
             ).fetchall()
+
         return [dict(row) for row in rows]
 
     def get_event_sectors(self, event_id: int) -> list[str]:
@@ -270,7 +580,113 @@ class Database:
                 """,
                 (event_id,),
             ).fetchall()
+
         return [row["sector"] for row in rows]
+
+    # =========================================================
+    # Saved reports
+    # =========================================================
+
+    def save_report(
+        self,
+        analysis_run_id: int,
+        artifact: ReportArtifact,
+    ) -> int:
+        now = datetime.now().isoformat(
+            timespec="seconds"
+        )
+
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO saved_reports(
+                    analysis_run_id,
+                    report_type,
+                    title,
+                    html_content,
+                    markdown_content,
+                    plain_summary,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(analysis_run_id, report_type)
+                DO UPDATE SET
+                    title = excluded.title,
+                    html_content = excluded.html_content,
+                    markdown_content = excluded.markdown_content,
+                    plain_summary = excluded.plain_summary,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    analysis_run_id,
+                    artifact.report_type,
+                    artifact.title,
+                    artifact.html,
+                    artifact.markdown,
+                    artifact.plain_summary,
+                    now,
+                    now,
+                ),
+            )
+
+            row = conn.execute(
+                """
+                SELECT id
+                FROM saved_reports
+                WHERE analysis_run_id = ?
+                  AND report_type = ?
+                """,
+                (
+                    analysis_run_id,
+                    artifact.report_type,
+                ),
+            ).fetchone()
+
+        return int(row["id"])
+
+    def list_saved_reports(
+        self,
+        limit: int = 100,
+    ) -> list[dict]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    sr.id,
+                    sr.analysis_run_id,
+                    sr.report_type,
+                    sr.title,
+                    sr.created_at,
+                    sr.updated_at
+                FROM saved_reports sr
+                ORDER BY sr.updated_at DESC, sr.id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+
+        return [dict(row) for row in rows]
+
+    def get_saved_report(
+        self,
+        report_id: int,
+    ) -> dict | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT *
+                FROM saved_reports
+                WHERE id = ?
+                """,
+                (report_id,),
+            ).fetchone()
+
+        return dict(row) if row else None
+
+    # =========================================================
+    # Internal save helpers
+    # =========================================================
 
     def _save_provider_results(
         self,
@@ -310,57 +726,170 @@ class Database:
                 ),
             )
 
-    def _save_events(self, conn, run_id, bundle, created_at):
-        for sector in bundle.structured.get("sectors", []):
-            sector_name = str(sector.get("sector", "")).strip()
+    def _save_provider_calls(
+        self,
+        conn,
+        run_id: int,
+        bundle: AnalysisBundle,
+        created_at: str,
+    ):
+        for metric in bundle.call_metrics:
+            conn.execute(
+                """
+                INSERT INTO provider_calls(
+                    analysis_run_id,
+                    phase,
+                    provider,
+                    model,
+                    status,
+                    duration_ms,
+                    input_tokens,
+                    output_tokens,
+                    total_tokens,
+                    estimated_cost,
+                    error,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    metric.phase,
+                    metric.provider,
+                    metric.model,
+                    metric.status,
+                    metric.duration_ms,
+                    metric.input_tokens,
+                    metric.output_tokens,
+                    metric.total_tokens,
+                    metric.estimated_cost,
+                    metric.error,
+                    created_at,
+                ),
+            )
 
-            for event in sector.get("events", []):
-                title = str(event.get("title", "")).strip()
+    def _save_events(
+        self,
+        conn,
+        run_id: int,
+        bundle: AnalysisBundle,
+        created_at: str,
+    ):
+        for sector in bundle.structured.get(
+            "sectors",
+            [],
+        ):
+            sector_name = str(
+                sector.get(
+                    "sector",
+                    "",
+                )
+            ).strip()
+
+            for event in sector.get(
+                "events",
+                [],
+            ):
+                title = str(
+                    event.get(
+                        "title",
+                        "",
+                    )
+                ).strip()
+
                 if not title:
                     continue
 
-                event_date = str(event.get("date", "")).strip()
-                source = str(event.get("source", "")).strip()
-                url = str(event.get("url", "")).strip()
-                analysis = str(event.get("analysis", "")).strip()
+                event_date = str(
+                    event.get(
+                        "date",
+                        "",
+                    )
+                ).strip()
+                source = str(
+                    event.get(
+                        "source",
+                        "",
+                    )
+                ).strip()
+                url = str(
+                    event.get(
+                        "url",
+                        "",
+                    )
+                ).strip()
+                analysis = str(
+                    event.get(
+                        "analysis",
+                        "",
+                    )
+                ).strip()
 
                 fingerprint = self._fingerprint(
-                    title, event_date, source
+                    title,
+                    event_date,
+                    source,
                 )
 
                 conn.execute(
                     """
                     INSERT INTO events(
-                        fingerprint, title, event_date, source, url,
-                        analysis, first_seen_at, last_seen_at
+                        fingerprint,
+                        title,
+                        event_date,
+                        source,
+                        url,
+                        analysis,
+                        first_seen_at,
+                        last_seen_at
                     )
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(fingerprint) DO UPDATE SET
+                    ON CONFLICT(fingerprint)
+                    DO UPDATE SET
                         url = excluded.url,
                         analysis = excluded.analysis,
                         last_seen_at = excluded.last_seen_at
                     """,
                     (
-                        fingerprint, title, event_date, source, url,
-                        analysis, created_at, created_at,
+                        fingerprint,
+                        title,
+                        event_date,
+                        source,
+                        url,
+                        analysis,
+                        created_at,
+                        created_at,
                     ),
                 )
 
                 event_row = conn.execute(
-                    "SELECT id FROM events WHERE fingerprint = ?",
+                    """
+                    SELECT id
+                    FROM events
+                    WHERE fingerprint = ?
+                    """,
                     (fingerprint,),
                 ).fetchone()
 
                 try:
-                    importance = int(event.get("importance", 0))
+                    importance = int(
+                        event.get(
+                            "importance",
+                            0,
+                        )
+                    )
                 except Exception:
                     importance = 0
 
                 conn.execute(
                     """
                     INSERT INTO analysis_events(
-                        analysis_run_id, event_id, sector,
-                        impact, impact_type, importance
+                        analysis_run_id,
+                        event_id,
+                        sector,
+                        impact,
+                        impact_type,
+                        importance
                     )
                     VALUES (?, ?, ?, ?, ?, ?)
                     """,
@@ -368,17 +897,41 @@ class Database:
                         run_id,
                         event_row["id"],
                         sector_name,
-                        str(event.get("impact", "")),
-                        str(event.get("impact_type", "")),
+                        str(
+                            event.get(
+                                "impact",
+                                "",
+                            )
+                        ),
+                        str(
+                            event.get(
+                                "impact_type",
+                                "",
+                            )
+                        ),
                         importance,
                     ),
                 )
 
     @staticmethod
-    def _fingerprint(title: str, event_date: str, source: str) -> str:
+    def _fingerprint(
+        title: str,
+        event_date: str,
+        source: str,
+    ) -> str:
         raw = "|".join([
             title.strip().lower(),
             event_date.strip().lower(),
             source.strip().lower(),
         ])
-        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+        return hashlib.sha256(
+            raw.encode("utf-8")
+        ).hexdigest()
+
+    @staticmethod
+    def _safe_float(value) -> float:
+        try:
+            return float(value)
+        except Exception:
+            return 0.0

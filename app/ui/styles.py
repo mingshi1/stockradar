@@ -179,4 +179,41 @@ QListWidget::item:selected {
     color: #1e3a8a;
 }
 
+
+QProgressBar {
+    background-color: #eef2f7;
+    border: 1px solid #d8dee8;
+    border-radius: 6px;
+    min-height: 12px;
+    max-height: 12px;
+}
+
+QProgressBar::chunk {
+    background-color: #2563eb;
+    border-radius: 5px;
+}
+
+QDoubleSpinBox {
+    background-color: white;
+    color: #222222;
+    border: 1px solid #d5d9df;
+    border-radius: 6px;
+    padding: 7px 10px;
+    min-height: 22px;
+}
+
+QDoubleSpinBox:focus {
+    border: 1px solid #2563eb;
+}
+
+QTabWidget::pane {
+    border: 1px solid #e1e4e8;
+    border-radius: 8px;
+    background-color: white;
+}
+
+QTabBar::tab {
+    padding: 8px 14px;
+}
+
 """

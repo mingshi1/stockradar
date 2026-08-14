@@ -1,12 +1,17 @@
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox,
     QFrame,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QMessageBox,
+    QProgressBar,
     QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
     QTextBrowser,
     QVBoxLayout,
     QWidget,
@@ -34,31 +39,35 @@ class DashboardPage(QWidget):
         self.custom_saved_sectors: list[str] = []
         self.session_custom_sectors: list[str] = []
         self.sector_checkboxes: list[QCheckBox] = []
+        self.progress_rows: dict[str, int] = {}
 
         self._build_ui()
 
     def _build_ui(self):
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(50, 30, 50, 30)
-        main_layout.setSpacing(15)
+        main_layout.setContentsMargins(45, 25, 45, 25)
+        main_layout.setSpacing(12)
 
         title = QLabel("今日板块事件分析")
         title.setObjectName("pageTitle")
 
         description = QLabel(
-            "选择板块后，由一个联网研究模型取证，再由多个AI基于同一证据独立分析并计算共识。"
+            "V0.8 会实时显示联网研究、每个模型、共识计算和 Judge 的实际任务状态。"
         )
         description.setObjectName("pageDescription")
 
         main_layout.addWidget(title)
         main_layout.addWidget(description)
 
+        # =====================================================
+        # Sector selection
+        # =====================================================
         sector_card = QFrame()
         sector_card.setObjectName("card")
 
         self.sector_layout = QVBoxLayout(sector_card)
-        self.sector_layout.setContentsMargins(30, 20, 30, 20)
-        self.sector_layout.setSpacing(12)
+        self.sector_layout.setContentsMargins(25, 16, 25, 16)
+        self.sector_layout.setSpacing(10)
 
         sector_title = QLabel("分析板块")
         sector_title.setObjectName("cardTitle")
@@ -66,7 +75,6 @@ class DashboardPage(QWidget):
 
         self.checkbox_container = QVBoxLayout()
         self.sector_layout.addLayout(self.checkbox_container)
-
         self._rebuild_checkboxes()
 
         custom_row = QHBoxLayout()
@@ -81,27 +89,22 @@ class DashboardPage(QWidget):
 
         add_button = QPushButton("加入本次分析")
         add_button.setObjectName("secondaryButton")
-        add_button.setCursor(
-            Qt.CursorShape.PointingHandCursor
-        )
         add_button.clicked.connect(
             self.add_session_custom_sector
         )
 
-        custom_row.addWidget(self.custom_sector_input, 1)
+        custom_row.addWidget(
+            self.custom_sector_input,
+            1,
+        )
         custom_row.addWidget(add_button)
 
         self.sector_layout.addLayout(custom_row)
-
-        self.custom_hint = QLabel(
-            "临时加入的板块仅用于当前程序会话；"
-            "需要长期保存请到“板块管理”。"
-        )
-        self.custom_hint.setObjectName("statusLabel")
-        self.sector_layout.addWidget(self.custom_hint)
-
         main_layout.addWidget(sector_card)
 
+        # =====================================================
+        # Start row
+        # =====================================================
         button_row = QHBoxLayout()
 
         self.status_label = QLabel("等待开始分析")
@@ -112,11 +115,8 @@ class DashboardPage(QWidget):
 
         self.analyze_button = QPushButton("开始分析")
         self.analyze_button.setObjectName("primaryButton")
-        self.analyze_button.setCursor(
-            Qt.CursorShape.PointingHandCursor
-        )
         self.analyze_button.setFixedWidth(180)
-        self.analyze_button.setFixedHeight(44)
+        self.analyze_button.setFixedHeight(42)
         self.analyze_button.clicked.connect(
             self._emit_analysis_request
         )
@@ -124,11 +124,96 @@ class DashboardPage(QWidget):
         button_row.addWidget(self.analyze_button)
         main_layout.addLayout(button_row)
 
+        # =====================================================
+        # Live task monitor
+        # =====================================================
+        monitor_card = QFrame()
+        monitor_card.setObjectName("card")
+
+        monitor_layout = QVBoxLayout(monitor_card)
+        monitor_layout.setContentsMargins(20, 14, 20, 14)
+        monitor_layout.setSpacing(8)
+
+        monitor_header = QHBoxLayout()
+
+        monitor_title = QLabel("分析任务进度")
+        monitor_title.setObjectName("cardTitle")
+
+        self.progress_percent_label = QLabel("0%")
+        self.progress_percent_label.setObjectName("statusLabel")
+
+        monitor_header.addWidget(monitor_title)
+        monitor_header.addStretch()
+        monitor_header.addWidget(
+            self.progress_percent_label
+        )
+
+        monitor_layout.addLayout(monitor_header)
+
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(False)
+        monitor_layout.addWidget(self.progress_bar)
+
+        self.stage_label = QLabel(
+            "尚未开始。这里显示的是任务阶段进度，不伪造模型内部思考百分比。"
+        )
+        self.stage_label.setWordWrap(True)
+        self.stage_label.setObjectName("statusLabel")
+        monitor_layout.addWidget(self.stage_label)
+
+        self.progress_table = QTableWidget(0, 6)
+        self.progress_table.setHorizontalHeaderLabels([
+            "任务",
+            "模型",
+            "状态",
+            "耗时",
+            "Token",
+            "估算成本*",
+        ])
+        self.progress_table.verticalHeader().setVisible(False)
+        self.progress_table.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers
+        )
+        self.progress_table.setSelectionMode(
+            QAbstractItemView.SelectionMode.NoSelection
+        )
+        self.progress_table.setMaximumHeight(170)
+
+        header = self.progress_table.horizontalHeader()
+        header.setSectionResizeMode(
+            0,
+            QHeaderView.ResizeMode.ResizeToContents,
+        )
+        header.setSectionResizeMode(
+            1,
+            QHeaderView.ResizeMode.Stretch,
+        )
+        for column in range(2, 6):
+            header.setSectionResizeMode(
+                column,
+                QHeaderView.ResizeMode.ResizeToContents,
+            )
+
+        monitor_layout.addWidget(self.progress_table)
+
+        cost_hint = QLabel(
+            "* 成本只在“AI 设置”填写每百万 Token 单价后估算；未配置时显示 —。"
+        )
+        cost_hint.setObjectName("statusLabel")
+        monitor_layout.addWidget(cost_hint)
+
+        main_layout.addWidget(monitor_card)
+
+        # =====================================================
+        # Result
+        # =====================================================
         result_card = QFrame()
         result_card.setObjectName("card")
 
         result_layout = QVBoxLayout(result_card)
-        result_layout.setContentsMargins(25, 18, 25, 18)
+        result_layout.setContentsMargins(22, 14, 22, 14)
 
         result_title = QLabel("分析结果")
         result_title.setObjectName("cardTitle")
@@ -137,11 +222,15 @@ class DashboardPage(QWidget):
         self.result_browser = QTextBrowser()
         self.result_browser.setOpenExternalLinks(True)
         self.result_browser.setPlaceholderText(
-            "点击“开始分析”后，结果将显示在这里。"
+            "分析完成后，Multi-AI 共识结果将显示在这里。"
         )
         result_layout.addWidget(self.result_browser)
 
         main_layout.addWidget(result_card, 1)
+
+    # =========================================================
+    # Sector management
+    # =========================================================
 
     def set_saved_custom_sectors(self, sectors: list[str]):
         current_checked = {
@@ -249,7 +338,9 @@ class DashboardPage(QWidget):
                         sector in checked_names
                     )
 
-                self.sector_checkboxes.append(checkbox)
+                self.sector_checkboxes.append(
+                    checkbox
+                )
                 row.addWidget(checkbox)
 
             row.addStretch()
@@ -260,37 +351,292 @@ class DashboardPage(QWidget):
             self.selected_sectors()
         )
 
+    # =========================================================
+    # Progress monitor
+    # =========================================================
+
+    def prepare_progress(
+        self,
+        *,
+        research_provider: str,
+        analyst_names: list[str],
+        judge_enabled: bool,
+        judge_provider: str,
+    ):
+        self.progress_rows.clear()
+        self.progress_table.setRowCount(0)
+        self.progress_bar.setValue(0)
+        self.progress_percent_label.setText("0%")
+        self.stage_label.setText(
+            "任务已创建，准备开始。"
+        )
+
+        self._ensure_progress_row(
+            key=f"research:{research_provider}",
+            task="联网研究",
+            provider=research_provider,
+        )
+
+        for provider in analyst_names:
+            self._ensure_progress_row(
+                key=f"analysis:{provider}",
+                task="独立分析",
+                provider=provider,
+            )
+
+        if judge_enabled:
+            self._ensure_progress_row(
+                key=f"judge:{judge_provider}",
+                task="Judge",
+                provider=judge_provider,
+            )
+
+    def _ensure_progress_row(
+        self,
+        *,
+        key: str,
+        task: str,
+        provider: str,
+    ) -> int:
+        if key in self.progress_rows:
+            return self.progress_rows[key]
+
+        row = self.progress_table.rowCount()
+        self.progress_table.insertRow(row)
+
+        values = [
+            task,
+            provider,
+            "等待",
+            "—",
+            "—",
+            "—",
+        ]
+
+        for column, value in enumerate(values):
+            self.progress_table.setItem(
+                row,
+                column,
+                QTableWidgetItem(value),
+            )
+
+        self.progress_rows[key] = row
+        return row
+
+    def apply_progress(self, event: dict):
+        percent = int(
+            event.get(
+                "percent",
+                self.progress_bar.value(),
+            )
+        )
+        percent = max(0, min(100, percent))
+
+        self.progress_bar.setValue(percent)
+        self.progress_percent_label.setText(
+            f"{percent}%"
+        )
+
+        message = str(
+            event.get(
+                "message",
+                "",
+            )
+        ).strip()
+
+        if message:
+            self.stage_label.setText(message)
+            self.status_label.setText(message)
+
+        stage = str(
+            event.get(
+                "stage",
+                "",
+            )
+        )
+        provider = str(
+            event.get(
+                "provider",
+                "",
+            )
+        )
+        status = str(
+            event.get(
+                "status",
+                "",
+            )
+        )
+
+        if not provider or stage not in {
+            "research",
+            "analysis",
+            "judge",
+        }:
+            return
+
+        task_names = {
+            "research": "联网研究",
+            "analysis": "独立分析",
+            "judge": "Judge",
+        }
+
+        key = f"{stage}:{provider}"
+
+        row = self._ensure_progress_row(
+            key=key,
+            task=task_names[stage],
+            provider=provider,
+        )
+
+        status_text = {
+            "running": "进行中…",
+            "success": "✓ 完成",
+            "error": "✕ 失败",
+            "skipped": "— 跳过",
+        }.get(
+            status,
+            status or "等待",
+        )
+
+        self._set_cell(
+            row,
+            2,
+            status_text,
+        )
+
+        duration_ms = event.get(
+            "duration_ms"
+        )
+
+        if duration_ms is not None:
+            try:
+                duration_seconds = (
+                    float(duration_ms)
+                    / 1000
+                )
+                self._set_cell(
+                    row,
+                    3,
+                    f"{duration_seconds:.1f}s",
+                )
+            except Exception:
+                pass
+
+        total_tokens = event.get(
+            "total_tokens"
+        )
+
+        if total_tokens is not None:
+            try:
+                total_tokens = int(
+                    total_tokens
+                )
+
+                if total_tokens > 0:
+                    self._set_cell(
+                        row,
+                        4,
+                        f"{total_tokens:,}",
+                    )
+            except Exception:
+                pass
+
+        if "estimated_cost" in event:
+            cost = event.get(
+                "estimated_cost"
+            )
+
+            if cost is None:
+                self._set_cell(
+                    row,
+                    5,
+                    "—",
+                )
+            else:
+                try:
+                    self._set_cell(
+                        row,
+                        5,
+                        f"{float(cost):.6f}",
+                    )
+                except Exception:
+                    pass
+
+    def mark_saved(self):
+        self.progress_bar.setValue(100)
+        self.progress_percent_label.setText(
+            "100%"
+        )
+        self.stage_label.setText(
+            "分析完成，结果已写入 SQLite。"
+        )
+        self.status_label.setText(
+            "分析完成并已保存到历史"
+        )
+
+    def _set_cell(
+        self,
+        row: int,
+        column: int,
+        text: str,
+    ):
+        item = self.progress_table.item(
+            row,
+            column,
+        )
+
+        if item is None:
+            item = QTableWidgetItem()
+            self.progress_table.setItem(
+                row,
+                column,
+                item,
+            )
+
+        item.setText(text)
+
+    # =========================================================
+    # Running/result
+    # =========================================================
+
     def set_running(self, running: bool):
-        self.analyze_button.setEnabled(not running)
+        self.analyze_button.setEnabled(
+            not running
+        )
+        self.analyze_button.setText(
+            "分析中..."
+            if running
+            else "开始分析"
+        )
 
         if running:
-            self.analyze_button.setText("分析中...")
-            self.status_label.setText(
-                "正在联网搜索近期事件，请稍候..."
-            )
             self.result_browser.setHtml(
                 """
-                <div style="padding:20px;">
-                    <h3>正在分析...</h3>
+                <div style="padding:15px;">
+                    <h3>Multi-AI 分析进行中</h3>
                     <p>
-                        正在联网取证，并让多个 AI 基于同一证据独立分析。
+                        上方会实时显示每个可观察阶段的状态。
+                        模型内部推理过程无法获得真实百分比，因此不会伪造。
                     </p>
                 </div>
                 """
             )
-        else:
-            self.analyze_button.setText("开始分析")
 
-    def show_result(self, html_content: str):
-        self.status_label.setText(
-            "分析完成并已保存到历史"
+    def show_result(
+        self,
+        html_content: str,
+    ):
+        self.result_browser.setHtml(
+            html_content
         )
-        self.result_browser.setHtml(html_content)
 
     def show_error(self, message: str):
         import html
 
-        self.status_label.setText("分析失败")
+        self.status_label.setText(
+            "分析失败"
+        )
+
         self.result_browser.setHtml(
             f"""
             <div style="padding:20px;">

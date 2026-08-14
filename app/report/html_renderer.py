@@ -94,6 +94,86 @@ def render_analysis_html(
             """
         )
 
+    runtime = data.get(
+        "runtime",
+        {},
+    )
+
+    if runtime:
+        duration_seconds = (
+            float(
+                runtime.get(
+                    "duration_ms",
+                    0,
+                )
+                or 0
+            )
+            / 1000
+        )
+        total_tokens = int(
+            runtime.get(
+                "total_tokens",
+                0,
+            )
+            or 0
+        )
+        input_tokens = int(
+            runtime.get(
+                "input_tokens",
+                0,
+            )
+            or 0
+        )
+        output_tokens = int(
+            runtime.get(
+                "output_tokens",
+                0,
+            )
+            or 0
+        )
+        estimated_cost = float(
+            runtime.get(
+                "estimated_cost",
+                0,
+            )
+            or 0
+        )
+        priced_calls = int(
+            runtime.get(
+                "priced_calls",
+                0,
+            )
+            or 0
+        )
+
+        cost_text = (
+            f"{estimated_cost:.6f}"
+            if priced_calls > 0
+            else "未配置单价"
+        )
+
+        parts.append(
+            f"""
+            <div style="
+                background:#f0fdf4;
+                padding:12px;
+                border-radius:8px;
+                margin-bottom:14px;
+            ">
+                <b>本次运行</b><br>
+                总耗时：{duration_seconds:.1f}s
+                &nbsp;&nbsp;
+                Input Tokens：{input_tokens:,}
+                &nbsp;&nbsp;
+                Output Tokens：{output_tokens:,}
+                &nbsp;&nbsp;
+                Total：{total_tokens:,}
+                &nbsp;&nbsp;
+                估算成本*：{cost_text}
+            </div>
+            """
+        )
+
     parts.append(
         f"""
         <div style="

@@ -11,6 +11,20 @@ class ProviderAnalysis:
 
 
 @dataclass(slots=True)
+class ProviderCallMetric:
+    phase: str
+    provider: str
+    model: str
+    status: str
+    duration_ms: int
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    estimated_cost: float | None = None
+    error: str | None = None
+
+
+@dataclass(slots=True)
 class AnalysisBundle:
     structured: dict
     research_text: str
@@ -25,10 +39,12 @@ class AnalysisBundle:
     provider_errors: dict[str, str] = field(
         default_factory=dict
     )
+    call_metrics: list[ProviderCallMetric] = field(
+        default_factory=list
+    )
 
     @property
     def provider(self) -> str:
-        # V0.5 database compatibility.
         return self.research_provider
 
     @property

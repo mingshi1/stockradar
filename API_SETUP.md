@@ -1,6 +1,6 @@
-# V0.7 API 配置指南
+# V0.8 API 配置指南
 
-V0.7 移除了 OpenAI，聚焦国内网络环境下更容易使用的模型。
+V0.8 移除了 OpenAI，聚焦国内网络环境下更容易使用的模型。
 
 当前支持：
 
@@ -75,7 +75,7 @@ https://bailian.console.aliyun.com/
 
 不同地域、业务空间和计费模式可能对应不同 Base URL。
 
-V0.7 提供的默认兼容地址：
+V0.8 提供的默认兼容地址：
 
 ```text
 https://dashscope.aliyuncs.com/compatible-mode/v1
@@ -155,7 +155,7 @@ API Key 管理
 
 创建 ARK API Key。
 
-V0.7 默认：
+V0.8 默认：
 
 ```text
 Base URL
@@ -179,7 +179,7 @@ doubao-seed-2-0-lite-260215
 → AI 设置 → Doubao → 模型
 ```
 
-V0.7 模型输入框允许手动编辑。
+V0.8 模型输入框允许手动编辑。
 
 软件还预置了以下便于尝试的名称：
 
@@ -211,7 +211,7 @@ https://platform.minimaxi.com/
 
 创建 API Key。
 
-V0.7 使用中国区 OpenAI-compatible 地址：
+V0.8 使用中国区 OpenAI-compatible 地址：
 
 ```text
 https://api.minimaxi.com/v1
@@ -233,7 +233,7 @@ MiniMax-M2.5-highspeed
 MiniMax-M2.1
 ```
 
-MiniMax 在 V0.7 参与独立分析 / Judge，
+MiniMax 在 V0.8 参与独立分析 / Judge，
 暂不作为联网 Research Provider。
 
 ---
@@ -306,3 +306,42 @@ Kimi
 ```
 
 最后再尝试开启 Judge。
+
+
+---
+
+# V0.8 Token 单价设置
+
+V0.8 会记录 Provider 返回的 Token usage。
+
+软件没有内置固定官方价格，因为价格可能随：
+
+- 模型版本
+- 上下文缓存
+- 套餐
+- 地域
+- 活动
+- 计费政策
+
+发生变化。
+
+请进入各 Provider 官方控制台查看你自己的实际计费价格，然后在：
+
+```text
+AI 设置
+→ 对应 Provider
+→ 输入单价 / 1M tokens
+→ 输出单价 / 1M tokens
+```
+
+自行填写。
+
+如果不想使用成本估算，保持：
+
+```text
+0
+```
+
+即可。
+
+软件会继续记录 Token，但成本显示为未配置。

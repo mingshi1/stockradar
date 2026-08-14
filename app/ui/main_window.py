@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -31,6 +32,7 @@ from app.ui.pages.news_page import NewsPage
 from app.ui.pages.report_page import ReportPage
 from app.ui.pages.sector_page import SectorPage
 from app.ui.pages.settings_page import SettingsPage
+from app.ui.pages.stats_page import StatsPage
 from app.ui.styles import APP_STYLE
 from app.ui.workers import (
     AnalysisWorker,
@@ -41,6 +43,10 @@ from app.ui.workers import (
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+
+        self.logger = logging.getLogger(
+            "StockEventRadar"
+        )
 
         self.config = AppConfig()
         self.database = Database()
@@ -62,12 +68,12 @@ class MainWindow(QMainWindow):
             "AI板块事件雷达"
         )
         self.resize(
-            1320,
-            840,
+            1360,
+            880,
         )
         self.setMinimumSize(
-            1080,
-            700,
+            1120,
+            720,
         )
 
         self._build_ui()
@@ -109,6 +115,7 @@ class MainWindow(QMainWindow):
         self.history_page = HistoryPage()
         self.sector_page = SectorPage()
         self.news_page = NewsPage()
+        self.stats_page = StatsPage()
         self.report_page = ReportPage()
         self.settings_page = SettingsPage(
             config=self.config,
@@ -120,10 +127,13 @@ class MainWindow(QMainWindow):
             self.history_page,
             self.sector_page,
             self.news_page,
+            self.stats_page,
             self.report_page,
             self.settings_page,
         ]:
-            self.pages.addWidget(page)
+            self.pages.addWidget(
+                page
+            )
 
         root_layout.addWidget(
             sidebar
@@ -142,7 +152,9 @@ class MainWindow(QMainWindow):
         sidebar.setObjectName(
             "sidebar"
         )
-        sidebar.setFixedWidth(220)
+        sidebar.setFixedWidth(
+            225
+        )
 
         layout = QVBoxLayout(
             sidebar
@@ -153,7 +165,7 @@ class MainWindow(QMainWindow):
             20,
             25,
         )
-        layout.setSpacing(10)
+        layout.setSpacing(9)
 
         title = QLabel(
             "AI板块事件雷达"
@@ -163,7 +175,7 @@ class MainWindow(QMainWindow):
         )
 
         subtitle = QLabel(
-            "China Multi-AI Radar"
+            "Observable Multi-AI Radar"
         )
         subtitle.setObjectName(
             "sidebarSubtitle"
@@ -171,7 +183,7 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(title)
         layout.addWidget(subtitle)
-        layout.addSpacing(30)
+        layout.addSpacing(25)
 
         self.nav_buttons: list[
             QPushButton
@@ -182,8 +194,9 @@ class MainWindow(QMainWindow):
             ("历史报告", 1),
             ("板块管理", 2),
             ("新闻源", 3),
-            ("晨报 / 报告中心", 4),
-            ("AI 设置", 5),
+            ("数据统计", 4),
+            ("晨报 / 报告中心", 5),
+            ("AI 设置", 6),
         ]
 
         for text, index in nav_items:
@@ -216,7 +229,7 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         version = QLabel(
-            "v0.7.0"
+            "v0.8.0"
         )
         version.setObjectName(
             "versionLabel"
@@ -230,59 +243,44 @@ class MainWindow(QMainWindow):
     def _connect_signals(
         self,
     ):
-        self.dashboard_page \
-            .analyze_requested \
-            .connect(
-                self.start_analysis
-            )
+        self.dashboard_page.analyze_requested.connect(
+            self.start_analysis
+        )
 
-        self.settings_page \
-            .save_requested \
-            .connect(
-                self.save_settings
-            )
+        self.settings_page.save_requested.connect(
+            self.save_settings
+        )
+        self.settings_page.test_requested.connect(
+            self.test_api_connection
+        )
 
-        self.settings_page \
-            .test_requested \
-            .connect(
-                self.test_api_connection
-            )
+        self.sector_page.add_requested.connect(
+            self.add_custom_sector
+        )
+        self.sector_page.delete_requested.connect(
+            self.delete_custom_sector
+        )
 
-        self.sector_page \
-            .add_requested \
-            .connect(
-                self.add_custom_sector
-            )
+        self.history_page.run_selected.connect(
+            self.show_history_run
+        )
 
-        self.sector_page \
-            .delete_requested \
-            .connect(
-                self.delete_custom_sector
-            )
+        self.stats_page.sector_changed.connect(
+            self.refresh_sector_trend
+        )
 
-        self.history_page \
-            .run_selected \
-            .connect(
-                self.show_history_run
-            )
-
-        self.report_page \
-            .generate_requested \
-            .connect(
-                self.generate_report
-            )
-
-        self.report_page \
-            .export_requested \
-            .connect(
-                self.export_current_report
-            )
-
-        self.report_page \
-            .copy_requested \
-            .connect(
-                self.copy_report_summary
-            )
+        self.report_page.generate_requested.connect(
+            self.generate_report
+        )
+        self.report_page.export_requested.connect(
+            self.export_current_report
+        )
+        self.report_page.copy_requested.connect(
+            self.copy_report_summary
+        )
+        self.report_page.saved_report_requested.connect(
+            self.open_saved_report
+        )
 
     def switch_page(
         self,
@@ -292,10 +290,8 @@ class MainWindow(QMainWindow):
             index
         )
 
-        for button_index, button in (
-            enumerate(
-                self.nav_buttons
-            )
+        for button_index, button in enumerate(
+            self.nav_buttons
         ):
             button.setChecked(
                 button_index == index
@@ -306,6 +302,7 @@ class MainWindow(QMainWindow):
             2,
             3,
             4,
+            5,
         ):
             self.refresh_database_views()
 
@@ -321,85 +318,119 @@ class MainWindow(QMainWindow):
             .list_custom_sectors()
         )
 
-        self.dashboard_page \
-            .set_saved_custom_sectors(
-                custom_sectors
-            )
-
-        self.sector_page \
-            .set_sectors(
-                custom_sectors
-            )
+        self.dashboard_page.set_saved_custom_sectors(
+            custom_sectors
+        )
+        self.sector_page.set_sectors(
+            custom_sectors
+        )
 
         runs = (
             self.database
             .list_analysis_runs()
         )
 
-        self.history_page \
-            .set_runs(runs)
+        self.history_page.set_runs(
+            runs
+        )
+        self.report_page.set_runs(
+            runs
+        )
 
-        self.report_page \
-            .set_runs(runs)
+        self.report_page.set_saved_reports(
+            self.database
+            .list_saved_reports()
+        )
 
-        self.news_page \
-            .set_events(
-                self.news_service
-                .list_events()
+        self.news_page.set_events(
+            self.news_service
+            .list_events()
+        )
+
+        sector_names = (
+            self.database
+            .list_sector_names()
+        )
+
+        self.stats_page.set_sector_names(
+            sector_names
+        )
+        self.stats_page.set_provider_stats(
+            self.database
+            .list_provider_stats()
+        )
+
+        current_sector = (
+            self.stats_page
+            .current_sector()
+        )
+
+        if current_sector:
+            self.refresh_sector_trend(
+                current_sector
             )
+        else:
+            self.stats_page.set_trend(
+                []
+            )
+
+    def refresh_sector_trend(
+        self,
+        sector_name: str,
+    ):
+        if not sector_name:
+            self.stats_page.set_trend(
+                []
+            )
+            return
+
+        self.stats_page.set_trend(
+            self.database
+            .list_sector_trends(
+                sector_name,
+                limit=30,
+            )
+        )
 
     def add_custom_sector(
         self,
         name: str,
     ):
-        added = (
-            self.database
-            .add_custom_sector(name)
+        added = self.database.add_custom_sector(
+            name
         )
 
         if not added:
             QMessageBox.information(
                 self,
                 "未新增",
-                "该板块已经存在，"
-                "或名称为空。",
+                "该板块已经存在，或名称为空。",
             )
             return
 
-        self.sector_page \
-            .add_success()
-
+        self.sector_page.add_success()
         self.refresh_database_views()
 
     def delete_custom_sector(
         self,
         name: str,
     ):
-        answer = (
-            QMessageBox.question(
-                self,
-                "确认删除",
-                f"确定删除自定义板块"
-                f"“{name}”吗？",
-            )
+        answer = QMessageBox.question(
+            self,
+            "确认删除",
+            f"确定删除自定义板块“{name}”吗？",
         )
 
-        if (
-            answer
-            != QMessageBox
-            .StandardButton.Yes
-        ):
+        if answer != QMessageBox.StandardButton.Yes:
             return
 
-        self.database \
-            .delete_custom_sector(
-                name
-            )
-
+        self.database.delete_custom_sector(
+            name
+        )
         self.refresh_database_views()
 
     # =========================================================
-    # Multi-AI analysis
+    # Multi-AI analysis + live progress
     # =========================================================
 
     def start_analysis(
@@ -430,11 +461,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 "缺少联网研究 API",
-                f"请先在“AI 设置”中"
-                f"配置 {research_provider} "
-                "API Key。",
+                f"请先在“AI 设置”中配置 "
+                f"{research_provider} API Key。",
             )
-            self.switch_page(5)
+            self.switch_page(6)
             return
 
         if (
@@ -447,8 +477,7 @@ class MainWindow(QMainWindow):
 
         provider_settings = {
             name:
-            self.config
-            .get_provider_config(
+            self.config.get_provider_config(
                 name
             )
             for name
@@ -456,9 +485,24 @@ class MainWindow(QMainWindow):
             .provider_names()
         }
 
+        if self.config.analysis_mode == "single":
+            analyst_names = [
+                research_provider
+            ]
+        else:
+            analyst_names = (
+                self.config
+                .enabled_provider_names()
+            )
+
+            if research_provider not in analyst_names:
+                analyst_names.insert(
+                    0,
+                    research_provider,
+                )
+
         needed_names = set(
-            self.config
-            .enabled_provider_names()
+            analyst_names
         )
         needed_names.add(
             research_provider
@@ -477,96 +521,119 @@ class MainWindow(QMainWindow):
                 self.config
                 .get_api_key(name)
             )
+
             if key:
                 api_keys[
                     name
                 ] = key
 
-        request = {
-            "sectors": (
-                selected_sectors
-            ),
-            "research_provider_name": (
-                research_provider
-            ),
-            "analysis_mode": (
-                self.config
-                .analysis_mode
-            ),
-            "judge_enabled": (
-                self.config
-                .judge_enabled
-            ),
-            "judge_provider_name": (
-                self.config
-                .judge_provider
-            ),
-            "provider_settings": (
-                provider_settings
-            ),
-            "api_keys": (
-                api_keys
-            ),
-        }
-
-        self.dashboard_page \
-            .set_running(
-                True
-            )
-
-        self.analysis_worker = (
-            AnalysisWorker(
-                analysis_service=(
-                    self.analysis_service
-                ),
-                request=request,
-            )
+        self.dashboard_page.prepare_progress(
+            research_provider=research_provider,
+            analyst_names=analyst_names,
+            judge_enabled=self.config.judge_enabled,
+            judge_provider=self.config.judge_provider,
         )
 
-        self.analysis_worker \
-            .result_ready \
-            .connect(
-                self.on_analysis_ready
-            )
+        request = {
+            "sectors": selected_sectors,
+            "research_provider_name": research_provider,
+            "analysis_mode": self.config.analysis_mode,
+            "judge_enabled": self.config.judge_enabled,
+            "judge_provider_name": self.config.judge_provider,
+            "provider_settings": provider_settings,
+            "api_keys": api_keys,
+        }
 
-        self.analysis_worker \
-            .error_occurred \
-            .connect(
-                self.on_analysis_error
-            )
+        self.dashboard_page.set_running(
+            True
+        )
 
-        self.analysis_worker \
-            .finished \
-            .connect(
-                self.on_analysis_finished
-            )
+        self.logger.info(
+            "Analysis started | sectors=%s | research=%s | analysts=%s",
+            selected_sectors,
+            research_provider,
+            analyst_names,
+        )
+
+        self.analysis_worker = AnalysisWorker(
+            analysis_service=self.analysis_service,
+            request=request,
+        )
+
+        self.analysis_worker.progress_changed.connect(
+            self.on_analysis_progress
+        )
+        self.analysis_worker.result_ready.connect(
+            self.on_analysis_ready
+        )
+        self.analysis_worker.error_occurred.connect(
+            self.on_analysis_error
+        )
+        self.analysis_worker.finished.connect(
+            self.on_analysis_finished
+        )
 
         self.analysis_worker.start()
+
+    def on_analysis_progress(
+        self,
+        event: dict,
+    ):
+        self.dashboard_page.apply_progress(
+            event
+        )
 
     def on_analysis_ready(
         self,
         bundle: AnalysisBundle,
     ):
+        self.dashboard_page.apply_progress(
+            {
+                "percent": 97,
+                "stage": "database",
+                "status": "running",
+                "message": "正在写入 SQLite 历史、Provider 用量与事件池…",
+            }
+        )
+
         try:
-            self.database \
-                .save_analysis(
-                    bundle
-                )
+            run_id = self.database.save_analysis(
+                bundle
+            )
         except Exception as exc:
+            self.logger.exception(
+                "Database save failed."
+            )
+
+            self.dashboard_page.apply_progress(
+                {
+                    "percent": 99,
+                    "stage": "database",
+                    "status": "error",
+                    "message": (
+                        "分析成功，但数据库保存失败。"
+                    ),
+                }
+            )
+
             QMessageBox.warning(
                 self,
                 "数据库保存失败",
-                "分析已经成功，"
-                "但写入 SQLite 失败："
+                "分析已经成功，但写入 SQLite 失败："
                 f"\n\n{exc}",
             )
-
-        self.dashboard_page \
-            .show_result(
-                render_analysis_html(
-                    bundle.structured
-                )
+        else:
+            self.logger.info(
+                "Analysis saved | run_id=%s",
+                run_id,
             )
+            self.dashboard_page.mark_saved()
+
+        self.dashboard_page.show_result(
+            render_analysis_html(
+                bundle.structured
+            )
+        )
 
         self.refresh_database_views()
 
@@ -574,10 +641,14 @@ class MainWindow(QMainWindow):
         self,
         message: str,
     ):
-        self.dashboard_page \
-            .show_error(
-                message
-            )
+        self.logger.error(
+            "Analysis failed | %s",
+            message,
+        )
+
+        self.dashboard_page.show_error(
+            message
+        )
 
         QMessageBox.critical(
             self,
@@ -588,11 +659,9 @@ class MainWindow(QMainWindow):
     def on_analysis_finished(
         self,
     ):
-        self.dashboard_page \
-            .set_running(
-                False
-            )
-
+        self.dashboard_page.set_running(
+            False
+        )
         self.analysis_worker = None
 
     # =========================================================
@@ -603,25 +672,21 @@ class MainWindow(QMainWindow):
         self,
         run_id: int,
     ):
-        run = (
-            self.database
-            .get_analysis_run(
-                run_id
-            )
+        run = self.database.get_analysis_run(
+            run_id
         )
 
         if not run:
             return
 
-        self.history_page \
-            .show_report(
-                render_analysis_html(
-                    run["result"]
-                )
+        self.history_page.show_report(
+            render_analysis_html(
+                run["result"]
             )
+        )
 
     # =========================================================
-    # Report Center
+    # Report Center + archive
     # =========================================================
 
     def generate_report(
@@ -629,11 +694,8 @@ class MainWindow(QMainWindow):
         run_id: int,
         report_type: str,
     ):
-        run = (
-            self.database
-            .get_analysis_run(
-                run_id
-            )
+        run = self.database.get_analysis_run(
+            run_id
         )
 
         if not run:
@@ -652,19 +714,21 @@ class MainWindow(QMainWindow):
         )
 
         try:
-            artifact = (
-                self.report_service
-                .generate(
-                    run=run,
-                    provider_results=(
-                        provider_results
-                    ),
-                    report_type=(
-                        report_type
-                    ),
-                )
+            artifact = self.report_service.generate(
+                run=run,
+                provider_results=provider_results,
+                report_type=report_type,
+            )
+
+            self.database.save_report(
+                analysis_run_id=run_id,
+                artifact=artifact,
             )
         except Exception as exc:
+            self.logger.exception(
+                "Report generation/archive failed."
+            )
+
             QMessageBox.critical(
                 self,
                 "报告生成失败",
@@ -672,15 +736,48 @@ class MainWindow(QMainWindow):
             )
             return
 
-        self.current_report_artifact = (
-            artifact
+        self.current_report_artifact = artifact
+
+        self.report_page.show_artifact(
+            artifact.title,
+            artifact.html,
         )
 
-        self.report_page \
-            .show_artifact(
-                artifact.title,
-                artifact.html,
+        self.report_page.set_saved_reports(
+            self.database
+            .list_saved_reports()
+        )
+
+    def open_saved_report(
+        self,
+        report_id: int,
+    ):
+        item = self.database.get_saved_report(
+            report_id
+        )
+
+        if not item:
+            QMessageBox.warning(
+                self,
+                "打开失败",
+                "找不到该归档报告。",
             )
+            return
+
+        artifact = ReportArtifact(
+            title=item["title"],
+            report_type=item["report_type"],
+            html=item["html_content"],
+            markdown=item["markdown_content"],
+            plain_summary=item["plain_summary"],
+        )
+
+        self.current_report_artifact = artifact
+
+        self.report_page.show_artifact(
+            artifact.title,
+            artifact.html,
+        )
 
     def copy_report_summary(
         self,
@@ -693,15 +790,11 @@ class MainWindow(QMainWindow):
             QMessageBox.information(
                 self,
                 "尚未生成报告",
-                "请先点击“生成预览”。",
+                "请先生成或打开一份报告。",
             )
             return
 
-        clipboard = (
-            QApplication
-            .clipboard()
-        )
-        clipboard.setText(
+        QApplication.clipboard().setText(
             artifact.plain_summary
         )
 
@@ -723,7 +816,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(
                 self,
                 "尚未生成报告",
-                "请先点击“生成预览”。",
+                "请先生成或打开一份报告。",
             )
             return
 
@@ -746,37 +839,23 @@ class MainWindow(QMainWindow):
             ),
         }
 
-        filter_text, suffix = (
-            format_info[
-                file_format
-            ]
-        )
+        filter_text, suffix = format_info[
+            file_format
+        ]
 
         suggested_name = (
             artifact.title
-            .replace(
-                "/",
-                "-",
-            )
-            .replace(
-                "\\",
-                "-",
-            )
-            .replace(
-                ":",
-                "-",
-            )
+            .replace("/", "-")
+            .replace("\\", "-")
+            .replace(":", "-")
             + suffix
         )
 
-        file_path, _ = (
-            QFileDialog
-            .getSaveFileName(
-                self,
-                "导出报告",
-                suggested_name,
-                filter_text,
-            )
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "导出报告",
+            suggested_name,
+            filter_text,
         )
 
         if not file_path:
@@ -790,12 +869,14 @@ class MainWindow(QMainWindow):
         try:
             export_report(
                 artifact=artifact,
-                file_format=(
-                    file_format
-                ),
+                file_format=file_format,
                 file_path=file_path,
             )
         except Exception as exc:
+            self.logger.exception(
+                "Report export failed."
+            )
+
             QMessageBox.critical(
                 self,
                 "导出失败",
@@ -824,26 +905,22 @@ class MainWindow(QMainWindow):
                 "DeepSeek",
             )
         )
-
         self.config.analysis_mode = (
             payload.get(
                 "analysis_mode",
                 "multi",
             )
         )
-
         self.config.judge_enabled = bool(
             payload.get(
                 "judge_enabled",
                 False,
             )
         )
-
         self.config.judge_provider = (
             payload.get(
                 "judge_provider",
-                self.config
-                .research_provider,
+                self.config.research_provider,
             )
         )
 
@@ -853,22 +930,29 @@ class MainWindow(QMainWindow):
                 {},
             ).items()
         ):
-            self.config \
-                .update_provider_config(
-                    provider_name,
-                    enabled=settings.get(
-                        "enabled",
-                        False,
-                    ),
-                    model=settings.get(
-                        "model",
-                        "",
-                    ),
-                    base_url=settings.get(
-                        "base_url",
-                        "",
-                    ),
-                )
+            self.config.update_provider_config(
+                provider_name,
+                enabled=settings.get(
+                    "enabled",
+                    False,
+                ),
+                model=settings.get(
+                    "model",
+                    "",
+                ),
+                base_url=settings.get(
+                    "base_url",
+                    "",
+                ),
+                input_price_per_million=settings.get(
+                    "input_price_per_million",
+                    0.0,
+                ),
+                output_price_per_million=settings.get(
+                    "output_price_per_million",
+                    0.0,
+                ),
+            )
 
             api_key = str(
                 settings.get(
@@ -879,30 +963,26 @@ class MainWindow(QMainWindow):
 
             if api_key:
                 try:
-                    self.config \
-                        .save_api_key(
-                            provider_name,
-                            api_key,
-                        )
+                    self.config.save_api_key(
+                        provider_name,
+                        api_key,
+                    )
                 except Exception as exc:
                     QMessageBox.critical(
                         self,
                         "保存失败",
-                        f"{provider_name} "
-                        "API Key 保存失败："
+                        f"{provider_name} API Key 保存失败："
                         f"\n\n{exc}",
                     )
                     return
 
         self.config.save()
-
-        self.settings_page \
-            .mark_saved()
+        self.settings_page.mark_saved()
 
         QMessageBox.information(
             self,
             "保存成功",
-            "国产 Multi-AI 设置已保存。",
+            "AI、模型与可选 Token 单价设置已保存。",
         )
 
     def test_api_connection(
@@ -914,8 +994,7 @@ class MainWindow(QMainWindow):
     ):
         api_key = (
             entered_api_key
-            or self.config
-            .get_api_key(
+            or self.config.get_api_key(
                 provider_name
             )
         )
@@ -924,8 +1003,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 "缺少 API Key",
-                f"请先输入 "
-                f"{provider_name} API Key。",
+                f"请先输入 {provider_name} API Key。",
             )
             return
 
@@ -938,8 +1016,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(
                 self,
                 "正在测试",
-                "当前已有一个 Provider "
-                "正在进行连接测试。",
+                "当前已有一个 Provider 正在进行连接测试。",
             )
             return
 
@@ -947,43 +1024,28 @@ class MainWindow(QMainWindow):
             provider_name
         )
 
-        self.settings_page \
-            .set_test_running(
-                provider_name,
-                True,
-            )
-
-        self.connection_worker = (
-            ConnectionWorker(
-                provider_manager=(
-                    self.provider_manager
-                ),
-                provider_name=(
-                    provider_name
-                ),
-                api_key=api_key,
-                model=model,
-                base_url=base_url,
-            )
+        self.settings_page.set_test_running(
+            provider_name,
+            True,
         )
 
-        self.connection_worker \
-            .success \
-            .connect(
-                self.on_connection_success
-            )
+        self.connection_worker = ConnectionWorker(
+            provider_manager=self.provider_manager,
+            provider_name=provider_name,
+            api_key=api_key,
+            model=model,
+            base_url=base_url,
+        )
 
-        self.connection_worker \
-            .error_occurred \
-            .connect(
-                self.on_connection_error
-            )
-
-        self.connection_worker \
-            .finished \
-            .connect(
-                self.on_connection_finished
-            )
+        self.connection_worker.success.connect(
+            self.on_connection_success
+        )
+        self.connection_worker.error_occurred.connect(
+            self.on_connection_error
+        )
+        self.connection_worker.finished.connect(
+            self.on_connection_finished
+        )
 
         self.connection_worker.start()
 
@@ -997,10 +1059,9 @@ class MainWindow(QMainWindow):
         )
 
         if name:
-            self.settings_page \
-                .show_test_success(
-                    name
-                )
+            self.settings_page.show_test_success(
+                name
+            )
 
         QMessageBox.information(
             self,
@@ -1019,10 +1080,9 @@ class MainWindow(QMainWindow):
         )
 
         if name:
-            self.settings_page \
-                .show_test_error(
-                    name
-                )
+            self.settings_page.show_test_error(
+                name
+            )
 
         QMessageBox.critical(
             self,
@@ -1039,13 +1099,10 @@ class MainWindow(QMainWindow):
         )
 
         if name:
-            self.settings_page \
-                .set_test_running(
-                    name,
-                    False,
-                )
+            self.settings_page.set_test_running(
+                name,
+                False,
+            )
 
-        self.connection_provider_name = (
-            None
-        )
+        self.connection_provider_name = None
         self.connection_worker = None

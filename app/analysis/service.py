@@ -1,6 +1,9 @@
 import json
+import logging
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+from typing import Callable
 
 from app.ai.manager import ProviderManager
 from app.analysis.consensus import (
@@ -10,26 +13,27 @@ from app.analysis.consensus import (
 from app.analysis.models import (
     AnalysisBundle,
     ProviderAnalysis,
+    ProviderCallMetric,
 )
+
+
+ProgressCallback = Callable[[dict], None]
 
 
 class AnalysisService:
     """
-    V0.6 Multi-AI pipeline:
+    V0.8 可观测 Multi-AI 流程。
 
-    1. 一个 Research Provider 联网取证。
-    2. 所有启用的分析模型读取完全相同的证据，独立分析。
-    3. Consensus Engine 做确定性聚合。
-    4. 可选 Judge AI 只总结共识/分歧，不篡改聚合分数。
+    progress_callback 会持续汇报“我们真实知道的阶段”，
+    而不是伪造模型内部思考百分比。
     """
 
     def __init__(
         self,
         provider_manager: ProviderManager,
     ):
-        self.provider_manager = (
-            provider_manager
-        )
+        self.provider_manager = provider_manager
+        self.logger = logging.getLogger("StockEventRadar")
 
     def analyze(
         self,
@@ -41,19 +45,26 @@ class AnalysisService:
         judge_provider_name: str,
         provider_settings: dict[str, dict],
         api_keys: dict[str, str],
+        progress_callback: ProgressCallback | None = None,
     ) -> AnalysisBundle:
         if not sectors:
-            raise ValueError(
-                "没有选择任何板块。"
-            )
+            raise ValueError("没有选择任何板块。")
 
+        started_at = time.perf_counter()
         generated_at = datetime.now()
+        call_metrics: list[ProviderCallMetric] = []
 
-        research_settings = (
-            provider_settings.get(
-                research_provider_name,
-                {},
-            )
+        self._progress(
+            progress_callback,
+            percent=2,
+            stage="prepare",
+            status="running",
+            message="正在准备分析任务…",
+        )
+
+        research_settings = provider_settings.get(
+            research_provider_name,
+            {},
         )
         research_key = api_keys.get(
             research_provider_name
@@ -65,10 +76,8 @@ class AnalysisService:
                 "尚未配置 API Key。"
             )
 
-        research_provider = (
-            self.provider_manager.get(
-                research_provider_name
-            )
+        research_provider = self.provider_manager.get(
+            research_provider_name
         )
 
         if not research_provider.info.supports_web_search:
@@ -90,23 +99,95 @@ class AnalysisService:
             )
         )
 
-        sector_text = "、".join(sectors)
+        self._progress(
+            progress_callback,
+            percent=8,
+            stage="research",
+            provider=research_provider_name,
+            status="running",
+            message=f"{research_provider_name} 正在联网搜索近期证据…",
+        )
 
-        research_text = (
-            research_provider.web_research(
+        research_started = time.perf_counter()
+
+        try:
+            research_call = research_provider.web_research(
                 api_key=research_key,
                 model=research_model,
                 base_url=research_base_url,
                 prompt=self._build_research_prompt(
                     generated_at,
-                    sector_text,
+                    "、".join(sectors),
                 ),
                 instructions=(
                     "你是一名严谨的A股行业研究员。"
-                    "你必须优先依赖联网搜索得到的真实信息，"
+                    "必须优先依赖联网搜索得到的真实信息，"
                     "不要凭模型记忆虚构近期新闻。"
                 ),
             )
+        except Exception as exc:
+            duration_ms = self._elapsed_ms(research_started)
+
+            call_metrics.append(
+                ProviderCallMetric(
+                    phase="research",
+                    provider=research_provider_name,
+                    model=research_model,
+                    status="error",
+                    duration_ms=duration_ms,
+                    error=str(exc),
+                )
+            )
+
+            self._progress(
+                progress_callback,
+                percent=8,
+                stage="research",
+                provider=research_provider_name,
+                status="error",
+                duration_ms=duration_ms,
+                message=f"联网研究失败：{exc}",
+            )
+            raise
+
+        research_duration = self._elapsed_ms(
+            research_started
+        )
+
+        research_cost = self._estimate_cost(
+            research_settings,
+            research_call.usage.input_tokens,
+            research_call.usage.output_tokens,
+        )
+
+        call_metrics.append(
+            ProviderCallMetric(
+                phase="research",
+                provider=research_provider_name,
+                model=research_model,
+                status="success",
+                duration_ms=research_duration,
+                input_tokens=research_call.usage.input_tokens,
+                output_tokens=research_call.usage.output_tokens,
+                total_tokens=research_call.usage.total_tokens,
+                estimated_cost=research_cost,
+            )
+        )
+
+        research_text = research_call.text
+
+        self._progress(
+            progress_callback,
+            percent=28,
+            stage="research",
+            provider=research_provider_name,
+            status="success",
+            duration_ms=research_duration,
+            input_tokens=research_call.usage.input_tokens,
+            output_tokens=research_call.usage.output_tokens,
+            total_tokens=research_call.usage.total_tokens,
+            estimated_cost=research_cost,
+            message="联网证据采集完成。",
         )
 
         analyst_names = (
@@ -120,75 +201,120 @@ class AnalysisService:
             ]
         )
 
-        # Research Provider 即使没勾选，也必须参与单模型/作为 canonical 候选。
-        if (
-            research_provider_name
-            not in analyst_names
-        ):
+        if research_provider_name not in analyst_names:
             analyst_names.insert(
                 0,
                 research_provider_name,
             )
 
-        provider_results: dict[
-            str,
-            dict,
-        ] = {}
-        provider_errors: dict[
-            str,
-            str,
-        ] = {}
-        provider_analyses: list[
-            ProviderAnalysis
-        ] = []
+        provider_results: dict[str, dict] = {}
+        provider_errors: dict[str, str] = {}
+        provider_analyses: list[ProviderAnalysis] = []
+
+        runnable: list[tuple[str, object, str, str, str]] = []
+
+        for provider_name in analyst_names:
+            settings = provider_settings.get(
+                provider_name,
+                {},
+            )
+            api_key = api_keys.get(provider_name)
+
+            provider = self.provider_manager.get(
+                provider_name
+            )
+            model = str(
+                settings.get(
+                    "model",
+                    provider.info.default_model,
+                )
+            )
+            base_url = str(
+                settings.get(
+                    "base_url",
+                    provider.info.default_base_url,
+                )
+            )
+
+            if not api_key:
+                error = "未配置 API Key"
+                provider_errors[provider_name] = error
+                provider_analyses.append(
+                    ProviderAnalysis(
+                        provider=provider_name,
+                        model=model,
+                        error=error,
+                    )
+                )
+                call_metrics.append(
+                    ProviderCallMetric(
+                        phase="analysis",
+                        provider=provider_name,
+                        model=model,
+                        status="skipped",
+                        duration_ms=0,
+                        error=error,
+                    )
+                )
+                self._progress(
+                    progress_callback,
+                    percent=30,
+                    stage="analysis",
+                    provider=provider_name,
+                    status="skipped",
+                    message=error,
+                )
+                continue
+
+            runnable.append(
+                (
+                    provider_name,
+                    provider,
+                    model,
+                    base_url,
+                    api_key,
+                )
+            )
+
+        if not runnable:
+            raise RuntimeError(
+                "没有任何配置完整的分析模型。"
+            )
+
+        self._progress(
+            progress_callback,
+            percent=30,
+            stage="analysis",
+            status="running",
+            message=f"开始 {len(runnable)} 个模型并行独立分析…",
+        )
 
         jobs = {}
+        job_started_at: dict[object, float] = {}
 
         max_workers = min(
-            max(
-                len(analyst_names),
-                1,
-            ),
-            5,
+            max(len(runnable), 1),
+            6,
         )
 
         with ThreadPoolExecutor(
-            max_workers=max_workers
+            max_workers=max_workers,
+            thread_name_prefix="AIProvider",
         ) as executor:
-            for provider_name in analyst_names:
-                settings = (
-                    provider_settings.get(
-                        provider_name,
-                        {},
-                    )
-                )
-                api_key = api_keys.get(
-                    provider_name
-                )
-
-                if not api_key:
-                    provider_errors[
-                        provider_name
-                    ] = "未配置 API Key"
-                    continue
-
-                provider = (
-                    self.provider_manager.get(
-                        provider_name
-                    )
-                )
-
-                model = str(
-                    settings.get(
-                        "model",
-                        provider.info.default_model,
-                    )
-                )
-                base_url = str(
-                    settings.get(
-                        "base_url",
-                        provider.info.default_base_url,
-                    )
+            for (
+                provider_name,
+                provider,
+                model,
+                base_url,
+                api_key,
+            ) in runnable:
+                self._progress(
+                    progress_callback,
+                    percent=32,
+                    stage="analysis",
+                    provider=provider_name,
+                    status="running",
+                    message=f"{provider_name} 正在独立分析同一份证据…",
                 )
 
                 future = executor.submit(
@@ -206,15 +332,37 @@ class AnalysisService:
                 jobs[future] = (
                     provider_name,
                     model,
+                    provider_settings.get(
+                        provider_name,
+                        {},
+                    ),
                 )
+                job_started_at[future] = time.perf_counter()
+
+            completed = 0
+            total = len(jobs)
 
             for future in as_completed(jobs):
-                provider_name, model = (
-                    jobs[future]
+                (
+                    provider_name,
+                    model,
+                    settings,
+                ) = jobs[future]
+
+                duration_ms = self._elapsed_ms(
+                    job_started_at[future]
+                )
+                completed += 1
+
+                percent = int(
+                    32
+                    + (completed / total) * 45
                 )
 
                 try:
-                    result = future.result()
+                    call_result = future.result()
+                    result = call_result.data
+
                     self._validate_provider_result(
                         result
                     )
@@ -231,8 +379,43 @@ class AnalysisService:
                         )
                     )
 
+                    cost = self._estimate_cost(
+                        settings,
+                        call_result.usage.input_tokens,
+                        call_result.usage.output_tokens,
+                    )
+
+                    call_metrics.append(
+                        ProviderCallMetric(
+                            phase="analysis",
+                            provider=provider_name,
+                            model=model,
+                            status="success",
+                            duration_ms=duration_ms,
+                            input_tokens=call_result.usage.input_tokens,
+                            output_tokens=call_result.usage.output_tokens,
+                            total_tokens=call_result.usage.total_tokens,
+                            estimated_cost=cost,
+                        )
+                    )
+
+                    self._progress(
+                        progress_callback,
+                        percent=percent,
+                        stage="analysis",
+                        provider=provider_name,
+                        status="success",
+                        duration_ms=duration_ms,
+                        input_tokens=call_result.usage.input_tokens,
+                        output_tokens=call_result.usage.output_tokens,
+                        total_tokens=call_result.usage.total_tokens,
+                        estimated_cost=cost,
+                        message=f"{provider_name} 分析完成。",
+                    )
+
                 except Exception as exc:
                     message = str(exc)
+
                     provider_errors[
                         provider_name
                     ] = message
@@ -245,12 +428,40 @@ class AnalysisService:
                         )
                     )
 
+                    call_metrics.append(
+                        ProviderCallMetric(
+                            phase="analysis",
+                            provider=provider_name,
+                            model=model,
+                            status="error",
+                            duration_ms=duration_ms,
+                            error=message,
+                        )
+                    )
+
+                    self.logger.warning(
+                        "Provider failed | %s | %s",
+                        provider_name,
+                        message,
+                    )
+
+                    self._progress(
+                        progress_callback,
+                        percent=percent,
+                        stage="analysis",
+                        provider=provider_name,
+                        status="error",
+                        duration_ms=duration_ms,
+                        message=message,
+                    )
+
         if not provider_results:
             details = "；".join(
                 f"{name}: {error}"
                 for name, error
                 in provider_errors.items()
             )
+
             raise RuntimeError(
                 "所有 AI 分析都失败。"
                 + (
@@ -260,30 +471,40 @@ class AnalysisService:
                 )
             )
 
-        consensus = build_consensus(
-            provider_results,
-            canonical_provider=(
-                research_provider_name
-            ),
+        self._progress(
+            progress_callback,
+            percent=80,
+            stage="consensus",
+            status="running",
+            message="正在计算 Multi-AI 共识…",
         )
 
-        consensus[
-            "provider_errors"
-        ] = provider_errors
-        consensus[
-            "research_provider"
-        ] = research_provider_name
-        consensus[
-            "research_model"
-        ] = research_model
-        consensus[
-            "analysis_mode"
-        ] = analysis_mode
-        consensus[
-            "judge_used"
-        ] = False
+        consensus_started = time.perf_counter()
 
-        # Optional judge.
+        consensus = build_consensus(
+            provider_results,
+            canonical_provider=research_provider_name,
+        )
+
+        consensus_duration = self._elapsed_ms(
+            consensus_started
+        )
+
+        consensus["provider_errors"] = provider_errors
+        consensus["research_provider"] = research_provider_name
+        consensus["research_model"] = research_model
+        consensus["analysis_mode"] = analysis_mode
+        consensus["judge_used"] = False
+
+        self._progress(
+            progress_callback,
+            percent=86,
+            stage="consensus",
+            status="success",
+            duration_ms=consensus_duration,
+            message="共识评分、一致度和离散度计算完成。",
+        )
+
         if (
             judge_enabled
             and len(provider_results) >= 2
@@ -291,19 +512,14 @@ class AnalysisService:
             judge_key = api_keys.get(
                 judge_provider_name
             )
-
-            judge_settings = (
-                provider_settings.get(
-                    judge_provider_name,
-                    {},
-                )
+            judge_settings = provider_settings.get(
+                judge_provider_name,
+                {},
             )
 
             if judge_key:
-                judge_provider = (
-                    self.provider_manager.get(
-                        judge_provider_name
-                    )
+                judge_provider = self.provider_manager.get(
+                    judge_provider_name
                 )
                 judge_model = str(
                     judge_settings.get(
@@ -318,58 +534,218 @@ class AnalysisService:
                     )
                 )
 
+                self._progress(
+                    progress_callback,
+                    percent=88,
+                    stage="judge",
+                    provider=judge_provider_name,
+                    status="running",
+                    message=f"{judge_provider_name} 正在总结模型共识与分歧…",
+                )
+
+                judge_started = time.perf_counter()
+
                 try:
-                    judge_result = (
-                        judge_provider.analyze_evidence(
-                            api_key=judge_key,
+                    judge_call = judge_provider.analyze_evidence(
+                        api_key=judge_key,
+                        model=judge_model,
+                        base_url=judge_base_url,
+                        system_prompt=self._judge_system_prompt(),
+                        user_prompt=self._judge_user_prompt(
+                            consensus,
+                        ),
+                    )
+
+                    judge_duration = self._elapsed_ms(
+                        judge_started
+                    )
+
+                    cost = self._estimate_cost(
+                        judge_settings,
+                        judge_call.usage.input_tokens,
+                        judge_call.usage.output_tokens,
+                    )
+
+                    call_metrics.append(
+                        ProviderCallMetric(
+                            phase="judge",
+                            provider=judge_provider_name,
                             model=judge_model,
-                            base_url=judge_base_url,
-                            system_prompt=(
-                                self._judge_system_prompt()
-                            ),
-                            user_prompt=(
-                                self._judge_user_prompt(
-                                    consensus,
-                                )
-                            ),
+                            status="success",
+                            duration_ms=judge_duration,
+                            input_tokens=judge_call.usage.input_tokens,
+                            output_tokens=judge_call.usage.output_tokens,
+                            total_tokens=judge_call.usage.total_tokens,
+                            estimated_cost=cost,
                         )
                     )
 
-                    consensus = (
-                        apply_judge_summary(
-                            consensus,
-                            judge_result,
-                        )
+                    consensus = apply_judge_summary(
+                        consensus,
+                        judge_call.data,
                     )
-                    consensus[
-                        "judge_provider"
-                    ] = judge_provider_name
-                    consensus[
-                        "judge_model"
-                    ] = judge_model
+                    consensus["judge_provider"] = judge_provider_name
+                    consensus["judge_model"] = judge_model
+
+                    self._progress(
+                        progress_callback,
+                        percent=94,
+                        stage="judge",
+                        provider=judge_provider_name,
+                        status="success",
+                        duration_ms=judge_duration,
+                        input_tokens=judge_call.usage.input_tokens,
+                        output_tokens=judge_call.usage.output_tokens,
+                        total_tokens=judge_call.usage.total_tokens,
+                        estimated_cost=cost,
+                        message="Judge 共识/分歧总结完成。",
+                    )
 
                 except Exception as exc:
-                    consensus[
-                        "judge_error"
-                    ] = str(exc)
+                    judge_duration = self._elapsed_ms(
+                        judge_started
+                    )
+
+                    call_metrics.append(
+                        ProviderCallMetric(
+                            phase="judge",
+                            provider=judge_provider_name,
+                            model=judge_model,
+                            status="error",
+                            duration_ms=judge_duration,
+                            error=str(exc),
+                        )
+                    )
+                    consensus["judge_error"] = str(exc)
+
+                    self._progress(
+                        progress_callback,
+                        percent=94,
+                        stage="judge",
+                        provider=judge_provider_name,
+                        status="error",
+                        duration_ms=judge_duration,
+                        message=f"Judge 失败，继续使用确定性共识：{exc}",
+                    )
+            else:
+                consensus["judge_error"] = (
+                    f"{judge_provider_name} 未配置 API Key"
+                )
+
+        total_duration_ms = self._elapsed_ms(
+            started_at
+        )
+
+        consensus["runtime"] = {
+            "duration_ms": total_duration_ms,
+            "calls": len(call_metrics),
+            "input_tokens": sum(
+                metric.input_tokens
+                for metric in call_metrics
+            ),
+            "output_tokens": sum(
+                metric.output_tokens
+                for metric in call_metrics
+            ),
+            "total_tokens": sum(
+                metric.total_tokens
+                for metric in call_metrics
+            ),
+            "estimated_cost": round(
+                sum(
+                    metric.estimated_cost or 0.0
+                    for metric in call_metrics
+                ),
+                6,
+            ),
+            "priced_calls": sum(
+                1
+                for metric in call_metrics
+                if metric.estimated_cost is not None
+            ),
+        }
+
+        self._progress(
+            progress_callback,
+            percent=96,
+            stage="finalize",
+            status="running",
+            duration_ms=total_duration_ms,
+            message="分析完成，正在交给本地数据库保存…",
+        )
 
         return AnalysisBundle(
             structured=consensus,
             research_text=research_text,
-            research_provider=(
-                research_provider_name
-            ),
+            research_provider=research_provider_name,
             research_model=research_model,
             sectors=list(sectors),
             generated_at=generated_at,
             mode=analysis_mode,
-            provider_analyses=(
-                provider_analyses
-            ),
-            provider_errors=(
-                provider_errors
-            ),
+            provider_analyses=provider_analyses,
+            provider_errors=provider_errors,
+            call_metrics=call_metrics,
         )
+
+    @staticmethod
+    def _estimate_cost(
+        settings: dict,
+        input_tokens: int,
+        output_tokens: int,
+    ) -> float | None:
+        try:
+            input_price = float(
+                settings.get(
+                    "input_price_per_million",
+                    0.0,
+                )
+                or 0.0
+            )
+            output_price = float(
+                settings.get(
+                    "output_price_per_million",
+                    0.0,
+                )
+                or 0.0
+            )
+        except Exception:
+            return None
+
+        if input_price <= 0 and output_price <= 0:
+            return None
+
+        # 部分兼容 API 不返回 usage。
+        # Token 全为 0 时不能把“未知”误报成“成本为 0”。
+        if input_tokens <= 0 and output_tokens <= 0:
+            return None
+
+        return (
+            max(0, input_tokens) / 1_000_000 * input_price
+            + max(0, output_tokens) / 1_000_000 * output_price
+        )
+
+    @staticmethod
+    def _elapsed_ms(
+        started: float,
+    ) -> int:
+        return int(
+            (time.perf_counter() - started)
+            * 1000
+        )
+
+    @staticmethod
+    def _progress(
+        callback: ProgressCallback | None,
+        **payload,
+    ):
+        if callback is None:
+            return
+
+        try:
+            callback(payload)
+        except Exception:
+            # UI 进度展示失败不能影响主分析流程。
+            pass
 
     @staticmethod
     def _build_research_prompt(
@@ -432,14 +808,14 @@ class AnalysisService:
 
 你正在参与“多模型交叉验证”。
 
-重要规则：
+规则：
 
 1. 你与其他模型互相看不到对方结论。
 2. 只能根据用户提供的同一份联网研究资料分析。
-3. 不得自己添加研究资料中不存在的近期事实。
+3. 不得自行添加研究资料中不存在的近期事实。
 4. 分数代表事件冲击，不代表未来股价预测。
-5. 即使你认为其他模型可能不同，也必须独立给出自己的判断。
-6. 必须输出合法 JSON，不要 Markdown，不要解释 JSON 格式本身。
+5. 必须独立判断。
+6. 必须输出合法 JSON，不要 Markdown。
 
 输出：
 
@@ -513,20 +889,19 @@ direction 只能是：
         return """
 你是 Multi-AI Consensus 的仲裁编辑。
 
-你不会重新判断新闻事实，也不能修改系统已经通过数学聚合计算出的：
+不能修改系统已经通过数学聚合计算出的：
 - score
 - agreement
 - dispersion
 - confidence
 
-你的任务仅仅是阅读不同模型的观点，解释：
+仅负责解释：
+1. 模型核心共识。
+2. 模型真正分歧。
+3. 分歧为什么造成不同评分。
+4. 谨慎的综合摘要。
 
-1. 模型在哪些核心逻辑上达成一致。
-2. 模型在哪些地方存在真正分歧。
-3. 为什么这些分歧会导致不同评分。
-4. 给出谨慎、可读的综合摘要。
-
-输出合法 JSON：
+输出：
 
 {
   "market_summary": "总体共识与主要分歧",
@@ -540,7 +915,7 @@ direction 只能是：
   ]
 }
 
-不要输出 JSON 外的任何内容。
+只输出 JSON。
 """
 
     @staticmethod
@@ -548,31 +923,19 @@ direction 只能是：
         consensus: dict,
     ) -> str:
         compact = {
-            "providers_used": (
-                consensus.get(
-                    "providers_used",
-                    [],
-                )
+            "providers_used": consensus.get(
+                "providers_used",
+                [],
             ),
             "sectors": [
                 {
-                    "sector": sector.get(
-                        "sector"
-                    ),
-                    "score": sector.get(
-                        "score"
-                    ),
-                    "agreement": sector.get(
-                        "agreement"
-                    ),
-                    "dispersion": sector.get(
-                        "dispersion"
-                    ),
-                    "provider_views": (
-                        sector.get(
-                            "provider_views",
-                            [],
-                        )
+                    "sector": sector.get("sector"),
+                    "score": sector.get("score"),
+                    "agreement": sector.get("agreement"),
+                    "dispersion": sector.get("dispersion"),
+                    "provider_views": sector.get(
+                        "provider_views",
+                        [],
                     ),
                 }
                 for sector in consensus.get(
@@ -601,12 +964,8 @@ direction 只能是：
                 "结构化结果不是 JSON 对象。"
             )
 
-        sectors = data.get(
-            "sectors"
-        )
-
         if not isinstance(
-            sectors,
+            data.get("sectors"),
             list,
         ):
             raise RuntimeError(
