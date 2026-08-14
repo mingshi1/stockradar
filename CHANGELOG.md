@@ -1,42 +1,39 @@
 # Changelog
 
-## 0.6.0
+## 0.7.0
+
+### Removed
+- OpenAI Provider 从应用 UI、配置和 ProviderManager 中移除。
 
 ### Added
-- OpenAI Provider.
-- Qwen Provider.
-- GLM Provider.
-- Kimi Provider.
-- Multi-provider settings UI.
-- Editable model names and Base URLs.
-- DeepSeek/OpenAI Research Provider selection.
-- Parallel independent model analysis.
-- Deterministic Consensus Engine.
-- Direction agreement percentage.
-- Score dispersion.
-- Consensus confidence.
-- Optional Judge AI.
-- Provider failure isolation.
-- SQLite `provider_results` table.
-- API_SETUP.md.
+- Doubao / 火山方舟 Provider。
+- Doubao 可作为联网 Research Provider。
+- MiniMax 中国开放平台 Provider。
+- 晨报 / 报告中心页面。
+- 30秒晨报。
+- 标准报告。
+- Multi-AI 共识报告。
+- 深度研究报告。
+- 复制报告摘要。
+- Markdown 导出。
+- HTML 导出。
+- PDF 导出。
+- PNG 长图导出。
+- API_SETUP.md 更新为国产模型优先配置。
 
 ### Preserved
-- DeepSeek Web Search.
-- Custom sectors.
-- SQLite history.
-- Event Pool.
-- Keyring API security.
-- Historical reports.
-- Background UI worker.
+- DeepSeek。
+- Qwen。
+- GLM。
+- Kimi。
+- Multi-AI 独立分析。
+- Consensus Engine。
+- Judge AI。
+- SQLite 历史。
+- Event Pool。
+- 自定义板块。
+- Keyring API Key 安全保存。
 
 ### Dependencies
-No new third-party Python packages.
-
-All five providers are integrated through the existing `openai` Python SDK / compatible APIs.
-
-### Next
-V0.7:
-- Report Center
-- PDF / PNG / Markdown / HTML
-- Executive summaries
-- API usage and cost tracking
+- 无新增第三方 Python 包。
+- PDF / PNG 使用 PySide6 / Qt 生成。

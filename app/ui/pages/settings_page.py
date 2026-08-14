@@ -306,6 +306,28 @@ class SettingsPage(QWidget):
             )
             layout.addWidget(qwen_hint)
 
+        if provider_name == "Doubao":
+            doubao_hint = QLabel(
+                "豆包提示：模型输入框可编辑。建议优先复制火山方舟控制台"
+                "“API 接入”页面显示的准确 Model ID。豆包也可以作为联网研究 Provider。"
+            )
+            doubao_hint.setWordWrap(True)
+            doubao_hint.setObjectName(
+                "statusLabel"
+            )
+            layout.addWidget(doubao_hint)
+
+        if provider_name == "MiniMax":
+            minimax_hint = QLabel(
+                "MiniMax 使用中国开放平台地址 api.minimaxi.com。"
+                "V0.7 默认 MiniMax-M2.7，模型输入框同样可自行修改。"
+            )
+            minimax_hint.setWordWrap(True)
+            minimax_hint.setObjectName(
+                "statusLabel"
+            )
+            layout.addWidget(minimax_hint)
+
         layout.addStretch()
 
         self.provider_widgets[

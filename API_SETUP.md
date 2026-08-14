@@ -1,18 +1,23 @@
-# V0.6 API 配置指南
+# V0.7 API 配置指南
 
-V0.6 支持五个 AI Provider：
+V0.7 移除了 OpenAI，聚焦国内网络环境下更容易使用的模型。
+
+当前支持：
 
 1. DeepSeek
-2. OpenAI
-3. Qwen（阿里云百炼）
-4. GLM（智谱开放平台）
-5. Kimi（月之暗面）
+2. Qwen / 阿里云百炼
+3. GLM / 智谱
+4. Kimi / Moonshot
+5. Doubao / 火山方舟
+6. MiniMax
 
 你不需要一次申请全部 API Key。
 
-## 推荐起步组合
+---
 
-### 最低可用
+## 推荐组合
+
+### 最低 Multi-AI
 
 ```text
 DeepSeek
@@ -20,27 +25,19 @@ DeepSeek
 任意另一家
 ```
 
-这样即可看到 Multi-AI 的独立判断与方向一致度。
-
-### 推荐测试
+### 推荐国内组合
 
 ```text
 DeepSeek
 Qwen
 GLM
+Doubao
+MiniMax
 ```
 
-### 更完整
+Kimi 可按需要再开启。
 
-```text
-DeepSeek
-OpenAI
-Qwen
-GLM
-Kimi
-```
-
-五家全开会增加 API 调用成本，请按需要启用。
+模型越多，API 成本越高。建议先用 2~3 个模型测试。
 
 ---
 
@@ -48,239 +45,264 @@ Kimi
 
 官方平台：
 
-https://platform.deepseek.com/
-
-创建 API Key 后，在软件：
-
 ```text
-AI 设置 → DeepSeek
+https://platform.deepseek.com/
 ```
 
-配置。
-
-默认：
+软件默认：
 
 ```text
 Base URL
 https://api.deepseek.com
 
-模型
+Model
 deepseek-v4-flash
 ```
 
-V0.6 默认仍把 DeepSeek 作为联网 Research Provider。
+DeepSeek 可以作为联网 Research Provider。
 
 ---
 
-# 2. OpenAI
-
-官方 API 平台：
-
-https://platform.openai.com/
-
-在 Dashboard / API Keys 创建 API Key。
-
-软件中：
-
-```text
-AI 设置 → OpenAI
-```
-
-默认：
-
-```text
-Base URL
-https://api.openai.com/v1
-
-模型
-gpt-5-mini
-```
-
-模型输入框是可编辑的，因此以后模型名更新时可以直接输入新模型名，
-不必等软件发版。
-
-OpenAI 在 V0.6 既能参与 Multi-AI 分析，也可以选择作为联网 Research Provider。
-
----
-
-# 3. Qwen / 阿里云百炼
+# 2. Qwen / 阿里云百炼
 
 官方控制台：
 
-https://bailian.console.aliyun.com/
-
-开通百炼后创建 API Key。
-
-重要：
-
-阿里云百炼不同地域、Workspace、按量付费 / Token Plan
-可能对应不同 API Host。
-
-创建 API Key 时，如果控制台显示了 API Host，
-建议直接把该地址复制到：
-
 ```text
-AI 设置 → Qwen → Base URL
+https://bailian.console.aliyun.com/
 ```
 
-V0.6 提供的默认兼容地址：
+创建 API Key 后，请注意：
+
+不同地域、业务空间和计费模式可能对应不同 Base URL。
+
+V0.7 提供的默认兼容地址：
 
 ```text
 https://dashscope.aliyuncs.com/compatible-mode/v1
 ```
 
-但你的控制台地址优先。
-
-推荐模型：
+如果控制台创建 API Key 时给出了专属 API Host，
+请优先把控制台地址复制到软件：
 
 ```text
-qwen3.7-plus
-qwen3.7-max
-qwen3.6-flash
-qwen-plus
+AI 设置
+→ Qwen
+→ Base URL
 ```
+
+模型输入框可编辑。
 
 ---
 
-# 4. GLM / 智谱
-
-官方平台：
-
-https://open.bigmodel.cn/
-
-登录后：
-
-```text
-个人中心 → API Keys
-```
-
-创建 API Key。
-
-默认：
-
-```text
-Base URL
-https://open.bigmodel.cn/api/paas/v4
-
-模型
-glm-4.7
-```
-
-可选：
-
-```text
-glm-5.2
-glm-4.7
-glm-4.7-flash
-```
-
----
-
-# 5. Kimi / Moonshot
+# 3. GLM / 智谱
 
 官方开放平台：
 
-https://platform.kimi.com/
+```text
+https://open.bigmodel.cn/
+```
 
-在开放平台控制台创建 API Key。
+创建 API Key 后在：
+
+```text
+AI 设置 → GLM
+```
+
+配置。
+
+默认 Base URL：
+
+```text
+https://open.bigmodel.cn/api/paas/v4
+```
+
+模型输入框可编辑。
+
+---
+
+# 4. Kimi / Moonshot
+
+官方开放平台：
+
+```text
+https://platform.moonshot.cn/
+```
 
 默认：
 
 ```text
 Base URL
 https://api.moonshot.cn/v1
-
-模型
-kimi-k2.6
 ```
 
-可选：
+模型输入框可编辑。
+
+---
+
+# 5. Doubao / 火山方舟
+
+火山方舟：
 
 ```text
-kimi-k3
-kimi-k2.6
-kimi-k2.5
+https://console.volcengine.com/ark/
 ```
 
-K3 更强但调用成本通常也更高，因此软件默认仍使用 K2.6。
+进入：
+
+```text
+API Key 管理
+```
+
+创建 ARK API Key。
+
+V0.7 默认：
+
+```text
+Base URL
+https://ark.cn-beijing.volces.com/api/v3
+
+Model
+doubao-seed-2-0-lite-260215
+```
+
+重要：
+
+火山方舟模型更新很快，而且你的账号实际可调用模型
+与控制台开通情况有关。
+
+因此推荐：
+
+```text
+火山方舟
+→ 模型 / API 接入
+→ 复制准确 Model ID
+→ AI 设置 → Doubao → 模型
+```
+
+V0.7 模型输入框允许手动编辑。
+
+软件还预置了以下便于尝试的名称：
+
+```text
+doubao-seed-evolving
+doubao-seed-2-1-pro
+doubao-seed-2-1-turbo
+```
+
+如果其中某个名称测试失败，请以你方舟控制台显示的准确 Model ID 为准。
+
+Doubao 可以作为联网 Research Provider。
+
+---
+
+# 6. MiniMax
+
+中国开放平台：
+
+```text
+https://platform.minimaxi.com/
+```
+
+在：
+
+```text
+账户管理 → 接口密钥
+```
+
+创建 API Key。
+
+V0.7 使用中国区 OpenAI-compatible 地址：
+
+```text
+https://api.minimaxi.com/v1
+```
+
+默认模型：
+
+```text
+MiniMax-M2.7
+```
+
+预置：
+
+```text
+MiniMax-M2.7
+MiniMax-M2.7-highspeed
+MiniMax-M2.5
+MiniMax-M2.5-highspeed
+MiniMax-M2.1
+```
+
+MiniMax 在 V0.7 参与独立分析 / Judge，
+暂不作为联网 Research Provider。
 
 ---
 
 # API Key 安全
 
-API Key 不会写进源码或 GitHub。
-
-程序继续使用：
+每一家 API Key 都通过：
 
 ```text
 keyring
 ```
 
-将不同 Provider 的 API Key 分别保存到操作系统凭据管理器。
+单独存入操作系统凭据管理器。
 
-普通配置，例如：
-
-```text
-模型名
-Base URL
-是否启用
-```
-
-保存在：
+例如：
 
 ```text
-%APPDATA%\StockEventRadar\settings.json
+StockEventRadar
+├── DeepSeek_api_key
+├── Qwen_api_key
+├── GLM_api_key
+├── Kimi_api_key
+├── Doubao_api_key
+└── MiniMax_api_key
 ```
+
+Key 不写进 GitHub，也不会明文写进 settings.json。
 
 ---
 
-# V0.6 分析机制
+# 推荐第一次测试
 
-不是：
-
-```text
-DeepSeek 搜自己的新闻
-OpenAI 搜自己的新闻
-Qwen 搜自己的新闻
-```
-
-而是：
+建议先：
 
 ```text
 Research Provider
-       ↓
-同一份实时联网证据
-       ↓
-┌────────┬────────┬────────┬────────┬────────┐
-DeepSeek OpenAI   Qwen     GLM      Kimi
-独立分析 独立分析 独立分析 独立分析 独立分析
-└────────┴────────┴────────┴────────┴────────┘
-                       ↓
-                Consensus Engine
-                       ↓
-         平均评分 / 方向一致度 / 离散度
-                       ↓
-              可选 Judge AI
-                       ↓
-                共识与分歧总结
+DeepSeek
+
+分析模式
+多模型交叉验证
+
+Judge
+关闭
 ```
 
-Judge 不允许修改数学聚合出来的分数。
-
----
-
-# 成本建议
-
-开发测试阶段：
+启用：
 
 ```text
-只勾 1~2 个板块
+DeepSeek
 +
-启用 2~3 个 AI
+Doubao
 +
-Judge 先关闭
+MiniMax
 ```
 
-确认稳定后再逐渐增加模型。
+只分析：
 
-这样既方便调试，也避免一次测试产生过多 API 消耗。
+```text
+黄金
++
+生物医药
+```
+
+测试成功以后，再加入：
+
+```text
+Qwen
+GLM
+Kimi
+```
+
+最后再尝试开启 Judge。

@@ -1,19 +1,27 @@
 from app.ai.base import AIProvider
 from app.ai.providers.deepseek import DeepSeekProvider
+from app.ai.providers.doubao import DoubaoProvider
 from app.ai.providers.kimi import KimiProvider
-from app.ai.providers.openai_provider import OpenAIProvider
+from app.ai.providers.minimax import MiniMaxProvider
 from app.ai.providers.qwen import QwenProvider
 from app.ai.providers.zhipu import ZhipuProvider
 
 
 class ProviderManager:
+    """
+    V0.7 国产优先 Provider 注册中心。
+
+    已移除 OpenAI。
+    """
+
     def __init__(self):
         providers = [
             DeepSeekProvider(),
-            OpenAIProvider(),
             QwenProvider(),
             ZhipuProvider(),
             KimiProvider(),
+            DoubaoProvider(),
+            MiniMaxProvider(),
         ]
 
         self._providers: dict[str, AIProvider] = {
@@ -44,16 +52,3 @@ class ProviderManager:
 
     def models_for(self, provider_name: str) -> list[str]:
         return list(self.info(provider_name).models)
-
-    def default_config(self) -> dict:
-        result = {}
-
-        for name, provider in self._providers.items():
-            info = provider.info
-            result[name] = {
-                "enabled": name == "DeepSeek",
-                "model": info.default_model,
-                "base_url": info.default_base_url,
-            }
-
-        return result

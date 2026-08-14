@@ -1,5 +1,9 @@
+from pathlib import Path
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QApplication,
+    QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -17,10 +21,14 @@ from app.analysis.service import AnalysisService
 from app.config.settings import AppConfig
 from app.database.database import Database
 from app.news.service import NewsService
+from app.report.exporters import export_report
 from app.report.html_renderer import render_analysis_html
+from app.report.models import ReportArtifact
+from app.report.service import ReportService
 from app.ui.pages.dashboard_page import DashboardPage
 from app.ui.pages.history_page import HistoryPage
 from app.ui.pages.news_page import NewsPage
+from app.ui.pages.report_page import ReportPage
 from app.ui.pages.sector_page import SectorPage
 from app.ui.pages.settings_page import SettingsPage
 from app.ui.styles import APP_STYLE
@@ -43,24 +51,23 @@ class MainWindow(QMainWindow):
         self.news_service = NewsService(
             self.database
         )
+        self.report_service = ReportService()
 
-        self.analysis_worker: (
-            AnalysisWorker | None
-        ) = None
-        self.connection_worker: (
-            ConnectionWorker | None
-        ) = None
-        self.connection_provider_name: (
-            str | None
-        ) = None
+        self.analysis_worker: AnalysisWorker | None = None
+        self.connection_worker: ConnectionWorker | None = None
+        self.connection_provider_name: str | None = None
+        self.current_report_artifact: ReportArtifact | None = None
 
         self.setWindowTitle(
             "AI板块事件雷达"
         )
-        self.resize(1280, 820)
+        self.resize(
+            1320,
+            840,
+        )
         self.setMinimumSize(
-            1050,
-            680,
+            1080,
+            700,
         )
 
         self._build_ui()
@@ -70,6 +77,10 @@ class MainWindow(QMainWindow):
         )
 
         self.refresh_database_views()
+
+    # =========================================================
+    # UI
+    # =========================================================
 
     def _build_ui(self):
         root_widget = QWidget()
@@ -94,25 +105,14 @@ class MainWindow(QMainWindow):
 
         self.pages = QStackedWidget()
 
-        self.dashboard_page = (
-            DashboardPage()
-        )
-        self.history_page = (
-            HistoryPage()
-        )
-        self.sector_page = (
-            SectorPage()
-        )
-        self.news_page = (
-            NewsPage()
-        )
-        self.settings_page = (
-            SettingsPage(
-                config=self.config,
-                provider_manager=(
-                    self.provider_manager
-                ),
-            )
+        self.dashboard_page = DashboardPage()
+        self.history_page = HistoryPage()
+        self.sector_page = SectorPage()
+        self.news_page = NewsPage()
+        self.report_page = ReportPage()
+        self.settings_page = SettingsPage(
+            config=self.config,
+            provider_manager=self.provider_manager,
         )
 
         for page in [
@@ -120,6 +120,7 @@ class MainWindow(QMainWindow):
             self.history_page,
             self.sector_page,
             self.news_page,
+            self.report_page,
             self.settings_page,
         ]:
             self.pages.addWidget(page)
@@ -141,7 +142,7 @@ class MainWindow(QMainWindow):
         sidebar.setObjectName(
             "sidebar"
         )
-        sidebar.setFixedWidth(210)
+        sidebar.setFixedWidth(220)
 
         layout = QVBoxLayout(
             sidebar
@@ -162,7 +163,7 @@ class MainWindow(QMainWindow):
         )
 
         subtitle = QLabel(
-            "Multi-AI Event Radar"
+            "China Multi-AI Radar"
         )
         subtitle.setObjectName(
             "sidebarSubtitle"
@@ -181,7 +182,8 @@ class MainWindow(QMainWindow):
             ("历史报告", 1),
             ("板块管理", 2),
             ("新闻源", 3),
-            ("AI 设置", 4),
+            ("晨报 / 报告中心", 4),
+            ("AI 设置", 5),
         ]
 
         for text, index in nav_items:
@@ -191,7 +193,9 @@ class MainWindow(QMainWindow):
             button.setObjectName(
                 "navButton"
             )
-            button.setCheckable(True)
+            button.setCheckable(
+                True
+            )
             button.setCursor(
                 Qt.CursorShape
                 .PointingHandCursor
@@ -202,7 +206,9 @@ class MainWindow(QMainWindow):
                 self.switch_page(i)
             )
 
-            layout.addWidget(button)
+            layout.addWidget(
+                button
+            )
             self.nav_buttons.append(
                 button
             )
@@ -210,16 +216,20 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         version = QLabel(
-            "v0.6.0"
+            "v0.7.0"
         )
         version.setObjectName(
             "versionLabel"
         )
-        layout.addWidget(version)
+        layout.addWidget(
+            version
+        )
 
         return sidebar
 
-    def _connect_signals(self):
+    def _connect_signals(
+        self,
+    ):
         self.dashboard_page \
             .analyze_requested \
             .connect(
@@ -256,6 +266,24 @@ class MainWindow(QMainWindow):
                 self.show_history_run
             )
 
+        self.report_page \
+            .generate_requested \
+            .connect(
+                self.generate_report
+            )
+
+        self.report_page \
+            .export_requested \
+            .connect(
+                self.export_current_report
+            )
+
+        self.report_page \
+            .copy_requested \
+            .connect(
+                self.copy_report_summary
+            )
+
     def switch_page(
         self,
         index: int,
@@ -277,14 +305,17 @@ class MainWindow(QMainWindow):
             1,
             2,
             3,
+            4,
         ):
             self.refresh_database_views()
 
     # =========================================================
-    # SQLite
+    # SQLite-backed views
     # =========================================================
 
-    def refresh_database_views(self):
+    def refresh_database_views(
+        self,
+    ):
         custom_sectors = (
             self.database
             .list_custom_sectors()
@@ -300,11 +331,16 @@ class MainWindow(QMainWindow):
                 custom_sectors
             )
 
+        runs = (
+            self.database
+            .list_analysis_runs()
+        )
+
         self.history_page \
-            .set_runs(
-                self.database
-                .list_analysis_runs()
-            )
+            .set_runs(runs)
+
+        self.report_page \
+            .set_runs(runs)
 
         self.news_page \
             .set_events(
@@ -356,7 +392,9 @@ class MainWindow(QMainWindow):
             return
 
         self.database \
-            .delete_custom_sector(name)
+            .delete_custom_sector(
+                name
+            )
 
         self.refresh_database_views()
 
@@ -396,7 +434,7 @@ class MainWindow(QMainWindow):
                 f"配置 {research_provider} "
                 "API Key。",
             )
-            self.switch_page(4)
+            self.switch_page(5)
             return
 
         if (
@@ -410,7 +448,9 @@ class MainWindow(QMainWindow):
         provider_settings = {
             name:
             self.config
-            .get_provider_config(name)
+            .get_provider_config(
+                name
+            )
             for name
             in self.provider_manager
             .provider_names()
@@ -430,14 +470,17 @@ class MainWindow(QMainWindow):
                 .judge_provider
             )
 
-        api_keys = {
-            name:
-            self.config
-            .get_api_key(name)
-            for name in needed_names
-            if self.config
-            .get_api_key(name)
-        }
+        api_keys = {}
+
+        for name in needed_names:
+            key = (
+                self.config
+                .get_api_key(name)
+            )
+            if key:
+                api_keys[
+                    name
+                ] = key
 
         request = {
             "sectors": (
@@ -461,11 +504,15 @@ class MainWindow(QMainWindow):
             "provider_settings": (
                 provider_settings
             ),
-            "api_keys": api_keys,
+            "api_keys": (
+                api_keys
+            ),
         }
 
         self.dashboard_page \
-            .set_running(True)
+            .set_running(
+                True
+            )
 
         self.analysis_worker = (
             AnalysisWorker(
@@ -502,7 +549,9 @@ class MainWindow(QMainWindow):
     ):
         try:
             self.database \
-                .save_analysis(bundle)
+                .save_analysis(
+                    bundle
+                )
         except Exception as exc:
             QMessageBox.warning(
                 self,
@@ -526,7 +575,9 @@ class MainWindow(QMainWindow):
         message: str,
     ):
         self.dashboard_page \
-            .show_error(message)
+            .show_error(
+                message
+            )
 
         QMessageBox.critical(
             self,
@@ -534,9 +585,13 @@ class MainWindow(QMainWindow):
             message,
         )
 
-    def on_analysis_finished(self):
+    def on_analysis_finished(
+        self,
+    ):
         self.dashboard_page \
-            .set_running(False)
+            .set_running(
+                False
+            )
 
         self.analysis_worker = None
 
@@ -566,6 +621,196 @@ class MainWindow(QMainWindow):
             )
 
     # =========================================================
+    # Report Center
+    # =========================================================
+
+    def generate_report(
+        self,
+        run_id: int,
+        report_type: str,
+    ):
+        run = (
+            self.database
+            .get_analysis_run(
+                run_id
+            )
+        )
+
+        if not run:
+            QMessageBox.warning(
+                self,
+                "报告生成失败",
+                "找不到对应历史分析。",
+            )
+            return
+
+        provider_results = (
+            self.database
+            .get_provider_results(
+                run_id
+            )
+        )
+
+        try:
+            artifact = (
+                self.report_service
+                .generate(
+                    run=run,
+                    provider_results=(
+                        provider_results
+                    ),
+                    report_type=(
+                        report_type
+                    ),
+                )
+            )
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "报告生成失败",
+                str(exc),
+            )
+            return
+
+        self.current_report_artifact = (
+            artifact
+        )
+
+        self.report_page \
+            .show_artifact(
+                artifact.title,
+                artifact.html,
+            )
+
+    def copy_report_summary(
+        self,
+    ):
+        artifact = (
+            self.current_report_artifact
+        )
+
+        if artifact is None:
+            QMessageBox.information(
+                self,
+                "尚未生成报告",
+                "请先点击“生成预览”。",
+            )
+            return
+
+        clipboard = (
+            QApplication
+            .clipboard()
+        )
+        clipboard.setText(
+            artifact.plain_summary
+        )
+
+        QMessageBox.information(
+            self,
+            "复制成功",
+            "报告摘要已经复制到剪贴板。",
+        )
+
+    def export_current_report(
+        self,
+        file_format: str,
+    ):
+        artifact = (
+            self.current_report_artifact
+        )
+
+        if artifact is None:
+            QMessageBox.information(
+                self,
+                "尚未生成报告",
+                "请先点击“生成预览”。",
+            )
+            return
+
+        format_info = {
+            "markdown": (
+                "Markdown 文件 (*.md)",
+                ".md",
+            ),
+            "html": (
+                "HTML 文件 (*.html)",
+                ".html",
+            ),
+            "pdf": (
+                "PDF 文件 (*.pdf)",
+                ".pdf",
+            ),
+            "png": (
+                "PNG 图片 (*.png)",
+                ".png",
+            ),
+        }
+
+        filter_text, suffix = (
+            format_info[
+                file_format
+            ]
+        )
+
+        suggested_name = (
+            artifact.title
+            .replace(
+                "/",
+                "-",
+            )
+            .replace(
+                "\\",
+                "-",
+            )
+            .replace(
+                ":",
+                "-",
+            )
+            + suffix
+        )
+
+        file_path, _ = (
+            QFileDialog
+            .getSaveFileName(
+                self,
+                "导出报告",
+                suggested_name,
+                filter_text,
+            )
+        )
+
+        if not file_path:
+            return
+
+        if not file_path.lower().endswith(
+            suffix
+        ):
+            file_path += suffix
+
+        try:
+            export_report(
+                artifact=artifact,
+                file_format=(
+                    file_format
+                ),
+                file_path=file_path,
+            )
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "导出失败",
+                str(exc),
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "导出成功",
+            "报告已经保存到：\n\n"
+            f"{Path(file_path)}",
+        )
+
+    # =========================================================
     # Settings
     # =========================================================
 
@@ -579,18 +824,21 @@ class MainWindow(QMainWindow):
                 "DeepSeek",
             )
         )
+
         self.config.analysis_mode = (
             payload.get(
                 "analysis_mode",
                 "multi",
             )
         )
+
         self.config.judge_enabled = bool(
             payload.get(
                 "judge_enabled",
                 False,
             )
         )
+
         self.config.judge_provider = (
             payload.get(
                 "judge_provider",
@@ -647,13 +895,14 @@ class MainWindow(QMainWindow):
                     return
 
         self.config.save()
+
         self.settings_page \
             .mark_saved()
 
         QMessageBox.information(
             self,
             "保存成功",
-            "Multi-AI 设置已保存。",
+            "国产 Multi-AI 设置已保存。",
         )
 
     def test_api_connection(
@@ -723,11 +972,13 @@ class MainWindow(QMainWindow):
             .connect(
                 self.on_connection_success
             )
+
         self.connection_worker \
             .error_occurred \
             .connect(
                 self.on_connection_error
             )
+
         self.connection_worker \
             .finished \
             .connect(
@@ -747,7 +998,9 @@ class MainWindow(QMainWindow):
 
         if name:
             self.settings_page \
-                .show_test_success(name)
+                .show_test_success(
+                    name
+                )
 
         QMessageBox.information(
             self,
@@ -767,7 +1020,9 @@ class MainWindow(QMainWindow):
 
         if name:
             self.settings_page \
-                .show_test_error(name)
+                .show_test_error(
+                    name
+                )
 
         QMessageBox.critical(
             self,
@@ -775,7 +1030,9 @@ class MainWindow(QMainWindow):
             message,
         )
 
-    def on_connection_finished(self):
+    def on_connection_finished(
+        self,
+    ):
         name = (
             self.connection_provider_name
             or ""

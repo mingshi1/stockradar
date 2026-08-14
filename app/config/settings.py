@@ -17,11 +17,6 @@ DEFAULT_PROVIDER_CONFIGS = {
         "model": "deepseek-v4-flash",
         "base_url": "https://api.deepseek.com",
     },
-    "OpenAI": {
-        "enabled": False,
-        "model": "gpt-5-mini",
-        "base_url": "https://api.openai.com/v1",
-    },
     "Qwen": {
         "enabled": False,
         "model": "qwen3.7-plus",
@@ -37,15 +32,25 @@ DEFAULT_PROVIDER_CONFIGS = {
         "model": "kimi-k2.6",
         "base_url": "https://api.moonshot.cn/v1",
     },
+    "Doubao": {
+        "enabled": False,
+        "model": "doubao-seed-2-0-lite-260215",
+        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+    },
+    "MiniMax": {
+        "enabled": False,
+        "model": "MiniMax-M2.7",
+        "base_url": "https://api.minimaxi.com/v1",
+    },
 }
 
 
 class AppConfig:
     """
-    V0.6 开始支持多 AI Provider。
+    V0.7 国产 Multi-AI 配置。
 
-    API Key 继续由 keyring 保存；
-    普通配置保存在 settings.json。
+    API Key 使用 keyring 保存。
+    模型、Base URL、是否启用等普通设置保存在 settings.json。
     """
 
     def __init__(self):
@@ -54,41 +59,27 @@ class AppConfig:
         self.judge_enabled = False
         self.judge_provider = "DeepSeek"
         self.providers = self._fresh_provider_defaults()
-
         self.load()
 
     @staticmethod
     def _fresh_provider_defaults() -> dict:
-        return json.loads(
-            json.dumps(DEFAULT_PROVIDER_CONFIGS)
-        )
+        return json.loads(json.dumps(DEFAULT_PROVIDER_CONFIGS))
 
     def load(self):
         if not CONFIG_FILE.exists():
             return
 
         try:
-            data = json.loads(
-                CONFIG_FILE.read_text(encoding="utf-8")
-            )
+            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
         except Exception:
             return
 
-        # Backward compatibility with V0.4/V0.5.
-        old_provider = data.get("provider")
-        old_model = data.get("model")
-
         self.research_provider = data.get(
             "research_provider",
-            old_provider or "DeepSeek",
+            data.get("provider", "DeepSeek"),
         )
-        self.analysis_mode = data.get(
-            "analysis_mode",
-            "multi",
-        )
-        self.judge_enabled = bool(
-            data.get("judge_enabled", False)
-        )
+        self.analysis_mode = data.get("analysis_mode", "multi")
+        self.judge_enabled = bool(data.get("judge_enabled", False))
         self.judge_provider = data.get(
             "judge_provider",
             self.research_provider,
@@ -98,12 +89,8 @@ class AppConfig:
 
         for name, defaults in self.providers.items():
             saved = saved_providers.get(name, {})
-
             defaults["enabled"] = bool(
-                saved.get(
-                    "enabled",
-                    defaults["enabled"],
-                )
+                saved.get("enabled", defaults["enabled"])
             )
             defaults["model"] = saved.get(
                 "model",
@@ -114,17 +101,16 @@ class AppConfig:
                 defaults["base_url"],
             )
 
-        if old_provider in self.providers:
-            self.providers[old_provider]["enabled"] = True
+        # V0.6 曾经有 OpenAI。V0.7 直接忽略该配置，
+        # 不删除系统凭据，避免擅自修改用户本地密钥。
+        if self.research_provider not in self.providers:
+            self.research_provider = "DeepSeek"
 
-            if old_model:
-                self.providers[old_provider]["model"] = old_model
+        if self.judge_provider not in self.providers:
+            self.judge_provider = "DeepSeek"
 
     def save(self):
-        APP_DATA_DIR.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
+        APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
         data = {
             "research_provider": self.research_provider,
@@ -135,21 +121,12 @@ class AppConfig:
         }
 
         CONFIG_FILE.write_text(
-            json.dumps(
-                data,
-                ensure_ascii=False,
-                indent=2,
-            ),
+            json.dumps(data, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
 
     def get_provider_config(self, provider_name: str) -> dict:
-        return dict(
-            self.providers.get(
-                provider_name,
-                {},
-            )
-        )
+        return dict(self.providers.get(provider_name, {}))
 
     def update_provider_config(
         self,
@@ -172,30 +149,18 @@ class AppConfig:
             if config.get("enabled")
         ]
 
-    def save_api_key(
-        self,
-        provider: str,
-        api_key: str,
-    ):
+    def save_api_key(self, provider: str, api_key: str):
         keyring.set_password(
             APP_NAME,
             f"{provider}_api_key",
             api_key,
         )
 
-    def get_api_key(
-        self,
-        provider: str,
-    ):
+    def get_api_key(self, provider: str):
         return keyring.get_password(
             APP_NAME,
             f"{provider}_api_key",
         )
 
-    def has_api_key(
-        self,
-        provider: str,
-    ) -> bool:
-        return bool(
-            self.get_api_key(provider)
-        )
+    def has_api_key(self, provider: str) -> bool:
+        return bool(self.get_api_key(provider))

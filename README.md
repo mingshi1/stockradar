@@ -1,236 +1,231 @@
-# AI板块事件雷达 v0.6.0
+# AI板块事件雷达 v0.7.0
 
-V0.6 正式进入 Multi-AI 阶段。
+V0.7 是“国产 Multi-AI + 晨报/报告中心”版本。
 
-## 核心变化
+## V0.7 核心变化
 
-- DeepSeek
-- OpenAI
-- Qwen
-- GLM
-- Kimi
-- 同一份联网证据，多模型独立分析
-- 多模型并行调用
-- Consensus Engine
-- 平均事件评分
-- 方向一致度
-- 评分离散度
-- 共识置信度
-- 可选 Judge AI
-- Provider 失败自动降级，不影响其他成功模型
-- SQLite 保存每家模型的独立结果
-- 保持 V0.5 自定义板块、历史报告和 Event Pool
+### AI Provider
 
-## 为什么 Multi-AI 不能各搜各的？
-
-如果：
+移除：
 
 ```text
-DeepSeek 看新闻 A
-OpenAI 看新闻 B
-Qwen 看新闻 C
-```
-
-最终结果不同，无法区分：
-
-- 是模型观点不同？
-- 还是输入事实根本不同？
-
-因此 V0.6 改成：
-
-```text
-联网 Research Provider
-        ↓
-同一份 Evidence
-        ↓
-多个 AI 独立分析
-        ↓
-Consensus Engine
-```
-
-这样差异才真正来自模型判断。
-
-## Research Provider
-
-当前允许：
-
-```text
-DeepSeek
 OpenAI
 ```
 
-默认：
+保留 / 新增：
 
 ```text
 DeepSeek
-```
-
-研究模型负责：
-
-```text
-联网搜索
-→ 来源
-→ 日期
-→ 新闻
-→ 事件逻辑证据
-```
-
-其他 AI 不重新搜索，直接分析这份共享证据。
-
-## 分析模式
-
-### 单模型快速
-
-```text
-Research Provider
-↓
-自己分析
-↓
-结果
-```
-
-适合快速测试、控制成本。
-
-### 多模型交叉验证
-
-所有启用且配置了 API Key 的 Provider 会并行分析：
-
-```text
-DeepSeek
-OpenAI
 Qwen
 GLM
 Kimi
+Doubao
+MiniMax
 ```
 
-某一家失败时，不会让整次任务直接失败；
-只要至少一个分析模型成功，就能继续生成报告。
-
-## Consensus Engine
-
-V0.6 的最终分数不是某个 Judge AI 随意决定。
-
-例如：
+其中：
 
 ```text
-DeepSeek   +72
-OpenAI     +61
-Qwen       +69
-GLM        +55
-Kimi       +66
+DeepSeek
+Doubao
 ```
 
-系统会计算：
+可作为联网 Research Provider。
 
-- score 均值
-- score 离散度
-- 正 / 中 / 负方向桶
-- 方向一致度
-- 模型平均置信度
-- 共识置信度
+其他启用模型读取同一份证据独立分析。
 
-最后产生透明的共识结果。
+---
 
-## Judge AI
-
-可选开启：
+## Multi-AI 流程
 
 ```text
-AI 设置
-→ 启用 Judge AI
+Research Provider
+      ↓
+同一份联网证据
+      ↓
+┌──────────┬──────────┬──────────┐
+DeepSeek   Qwen       GLM
+Doubao     Kimi       MiniMax
+└──────────┴──────────┴──────────┘
+      ↓
+Consensus Engine
+      ↓
+平均评分
+方向一致度
+评分离散度
+共识置信度
+      ↓
+可选 Judge
 ```
 
-Judge 只能：
+---
 
-- 总结共识
-- 总结分歧
-- 解释为什么评分不同
+# 新增：晨报 / 报告中心
 
-Judge 不允许覆盖：
-
-- 平均 score
-- agreement
-- dispersion
-- consensus confidence
-
-这样避免“最后一个 AI 一票否决前面全部模型”。
-
-## 数据库
-
-V0.6 在 V0.5 的 SQLite 上新增：
+左侧新增：
 
 ```text
+晨报 / 报告中心
+```
+
+可以从 SQLite 中任意一条历史分析生成：
+
+```text
+30秒晨报
+标准报告
+Multi-AI共识报告
+深度研究报告
+```
+
+## 30秒晨报
+
+自动提取：
+
+- 市场摘要
+- 最重要板块
+- 事件评分
+- AI 一致度
+- 5 条核心事件
+
+晨报不额外调用 AI。
+
+也就是说：
+
+```text
+已有 Multi-AI 分析
+        ↓
+本地压缩
+        ↓
+30秒晨报
+```
+
+没有额外 API 成本。
+
+---
+
+# 报告导出
+
+V0.7 支持：
+
+```text
+复制摘要
+Markdown
+HTML
+PDF
+PNG长图
+```
+
+PDF 和 PNG 使用 PySide6 / Qt 自己生成，
+因此本版本没有新增 PDF 第三方依赖。
+
+---
+
+# 深度研究报告
+
+深度报告会额外保留：
+
+```text
+综合共识
++
+事件分析
++
+风险
++
+原始联网研究资料
++
+各模型原始 JSON 结果
+```
+
+它适合复核 AI 到底为什么得出某个结果。
+
+---
+
+# SQLite
+
+继续沿用：
+
+```text
+%APPDATA%\StockEventRadar\stockradar.db
+```
+
+V0.5 / V0.6 历史记录和自定义板块都会继续使用。
+
+数据库包含：
+
+```text
+analysis_runs
+events
+analysis_events
+custom_sectors
 provider_results
 ```
 
-一条历史分析可能对应：
+---
+
+# 安装
+
+仍然使用：
 
 ```text
-analysis_run #23
-
-provider_results
-├── DeepSeek
-├── OpenAI
-├── Qwen
-├── GLM
-└── Kimi
+D:\miniconda3\envs\stockradar-dev\python.exe
 ```
 
-方便以后做：
-
-- 模型长期准确性比较
-- 某模型偏乐观/偏悲观统计
-- 成本统计
-- 模型权重学习
-
-## 安装依赖
-
-仍然只需要：
+安装：
 
 ```powershell
 python -m pip install -r requirements.txt
 ```
 
-V0.6 没有要求安装：
+V0.7 没有增加新的第三方 Python 包。
 
-```text
-dashscope
-zhipuai
-kimi SDK
-```
+---
 
-因为这些平台都通过 OpenAI-compatible API 接入。
+# API
 
-## API 申请与配置
-
-详见：
+详细说明：
 
 ```text
 API_SETUP.md
 ```
 
-## 推荐第一次测试
+新增需要申请的主要是：
 
-1. 保留现有 DeepSeek。
-2. 再申请 Qwen 或 GLM 中任意一个 API Key。
-3. AI 设置里启用 DeepSeek + 第二个 Provider。
-4. 分析模式选择 `多模型交叉验证`。
-5. Judge 暂时关闭。
-6. 首页只分析 `黄金 + 生物医药`。
-7. 查看报告里的“各模型独立判断”和“方向一致度”。
-8. 测试通过后再继续增加 Kimi / OpenAI。
+```text
+Doubao / 火山方舟
+MiniMax
+```
 
-## V0.7 计划
+你可以只申请其中一个，也可以两个都申请。
 
-下一版重点转向报告产品化：
+---
 
-- 报告中心
-- 30秒摘要
-- 标准报告
-- 深度报告
-- Markdown 导出
-- HTML 导出
-- PDF 导出
-- PNG 长图
-- Multi-AI 共识报告
-- Token / API 调用成本记录
+# 推荐测试顺序
+
+1. 启动 V0.7。
+2. 确认 OpenAI 已经从设置页消失。
+3. 确认原 DeepSeek Key 仍能使用。
+4. 配置豆包或 MiniMax 中任意一个。
+5. 单独测试该 Provider。
+6. 打开 Multi-AI，只启用 DeepSeek + 新 Provider。
+7. 分析 1~2 个板块。
+8. 确认共识结果正常。
+9. 打开“晨报 / 报告中心”。
+10. 生成“30秒晨报”。
+11. 测试复制摘要。
+12. 分别导出 Markdown / HTML / PDF / PNG。
+13. 再生成“深度研究报告”。
+
+---
+
+# 下一步方向
+
+V0.8 建议重点：
+
+- API Token / 成本统计
+- Provider 耗时统计
+- 报告自动命名与归档
+- 每日晨报记录
+- 定时生成晨报基础
+- 新闻 Event Pool 语义去重
+- 历史板块趋势图
+- 模型长期偏差统计
