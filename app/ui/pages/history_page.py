@@ -62,10 +62,20 @@ class HistoryPage(QWidget):
                 " ",
             )
 
+            provider_count = int(
+                run.get("provider_count", 0) or 0
+            )
+
+            mode_text = (
+                f"Multi-AI · {provider_count} 模型"
+                if provider_count >= 2
+                else f"{run.get('provider', '')} · {run.get('model', '')}"
+            )
+
             item = QListWidgetItem(
                 f"{created}\n"
                 f"{sectors}\n"
-                f"{run.get('provider', '')} · {run.get('model', '')}"
+                f"{mode_text}"
             )
             item.setData(1000, int(run["id"]))
             self.list_widget.addItem(item)

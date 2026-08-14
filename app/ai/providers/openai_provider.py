@@ -1,15 +1,16 @@
 from app.ai.base import AIProvider, ProviderInfo
 
 
-class DeepSeekProvider(AIProvider):
+class OpenAIProvider(AIProvider):
     info = ProviderInfo(
-        name="DeepSeek",
-        default_base_url="https://api.deepseek.com",
+        name="OpenAI",
+        default_base_url="https://api.openai.com/v1",
         models=(
-            "deepseek-v4-flash",
-            "deepseek-v4-pro",
+            "gpt-5-mini",
+            "gpt-5.2",
+            "gpt-5.1",
         ),
-        default_model="deepseek-v4-flash",
+        default_model="gpt-5-mini",
         supports_web_search=True,
     )
 
@@ -32,18 +33,17 @@ class DeepSeekProvider(AIProvider):
                 instructions=instructions,
                 input=prompt,
                 tools=[{"type": "web_search"}],
-                tool_choice={"type": "web_search"},
             )
         except Exception as exc:
             raise RuntimeError(
-                f"DeepSeek 联网搜索失败：{exc}"
+                f"OpenAI 联网搜索失败：{exc}"
             ) from exc
 
         text = (response.output_text or "").strip()
 
         if not text:
             raise RuntimeError(
-                "DeepSeek 联网搜索没有返回有效内容。"
+                "OpenAI 联网搜索没有返回有效内容。"
             )
 
         return text

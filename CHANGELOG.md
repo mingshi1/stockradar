@@ -1,27 +1,42 @@
 # Changelog
 
-## 0.5.0
+## 0.6.0
 
 ### Added
-- 自定义板块临时分析。
-- 自定义板块持久保存。
-- SQLite 本地数据库。
-- `analysis_runs` 历史分析表。
-- `events` 事件池表。
-- `analysis_events` 分析-事件关联表。
-- `custom_sectors` 自定义板块表。
-- SHA-256 事件基础 fingerprint。
-- 历史报告查看页面。
-- SQLite Event Pool 新闻页面。
+- OpenAI Provider.
+- Qwen Provider.
+- GLM Provider.
+- Kimi Provider.
+- Multi-provider settings UI.
+- Editable model names and Base URLs.
+- DeepSeek/OpenAI Research Provider selection.
+- Parallel independent model analysis.
+- Deterministic Consensus Engine.
+- Direction agreement percentage.
+- Score dispersion.
+- Consensus confidence.
+- Optional Judge AI.
+- Provider failure isolation.
+- SQLite `provider_results` table.
+- API_SETUP.md.
 
-### Changed
-- 每次成功分析会自动保存。
-- “板块管理”页面由占位页变成可用页面。
-- “历史报告”页面由占位页变成可用页面。
-- “新闻源”页面从临时研究文本升级为数据库事件池。
-- 分析 Prompt 支持用户自行输入的主题板块。
+### Preserved
+- DeepSeek Web Search.
+- Custom sectors.
+- SQLite history.
+- Event Pool.
+- Keyring API security.
+- Historical reports.
+- Background UI worker.
 
-### API / Dependencies
-- 无新增 API。
-- 无新增第三方 Python 包。
-- SQLite 使用 Python 标准库 `sqlite3`。
+### Dependencies
+No new third-party Python packages.
+
+All five providers are integrated through the existing `openai` Python SDK / compatible APIs.
+
+### Next
+V0.7:
+- Report Center
+- PDF / PNG / Markdown / HTML
+- Executive summaries
+- API usage and cost tracking

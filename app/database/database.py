@@ -77,6 +77,21 @@ class Database:
                     created_at TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS provider_results (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    analysis_run_id INTEGER NOT NULL,
+                    provider TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    result_json TEXT,
+                    error TEXT,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (analysis_run_id)
+                        REFERENCES analysis_runs(id) ON DELETE CASCADE
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_provider_results_run
+                ON provider_results(analysis_run_id);
+
                 CREATE INDEX IF NOT EXISTS idx_runs_created
                 ON analysis_runs(created_at DESC);
 
@@ -137,6 +152,12 @@ class Database:
             )
             run_id = int(cursor.lastrowid)
             self._save_events(conn, run_id, bundle, created_at)
+            self._save_provider_results(
+                conn,
+                run_id,
+                bundle,
+                created_at,
+            )
 
         return run_id
 
@@ -144,10 +165,21 @@ class Database:
         with self.connect() as conn:
             rows = conn.execute(
                 """
-                SELECT id, created_at, provider, model,
-                       sectors_json, market_summary
-                FROM analysis_runs
-                ORDER BY id DESC
+                SELECT
+                    ar.id,
+                    ar.created_at,
+                    ar.provider,
+                    ar.model,
+                    ar.sectors_json,
+                    ar.market_summary,
+                    (
+                        SELECT COUNT(*)
+                        FROM provider_results pr
+                        WHERE pr.analysis_run_id = ar.id
+                          AND pr.error IS NULL
+                    ) AS provider_count
+                FROM analysis_runs ar
+                ORDER BY ar.id DESC
                 LIMIT ?
                 """,
                 (limit,),
@@ -178,6 +210,41 @@ class Database:
         item["result"] = json.loads(item.pop("result_json"))
         return item
 
+    def get_provider_results(
+        self,
+        run_id: int,
+    ) -> list[dict]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT provider, model, result_json, error, created_at
+                FROM provider_results
+                WHERE analysis_run_id = ?
+                ORDER BY id
+                """,
+                (run_id,),
+            ).fetchall()
+
+        result = []
+
+        for row in rows:
+            item = dict(row)
+
+            if item.get("result_json"):
+                try:
+                    item["result"] = json.loads(
+                        item.pop("result_json")
+                    )
+                except Exception:
+                    item["result"] = None
+            else:
+                item.pop("result_json", None)
+                item["result"] = None
+
+            result.append(item)
+
+        return result
+
     def list_events(self, limit: int = 300) -> list[dict]:
         with self.connect() as conn:
             rows = conn.execute(
@@ -204,6 +271,44 @@ class Database:
                 (event_id,),
             ).fetchall()
         return [row["sector"] for row in rows]
+
+    def _save_provider_results(
+        self,
+        conn,
+        run_id: int,
+        bundle: AnalysisBundle,
+        created_at: str,
+    ):
+        for analysis in bundle.provider_analyses:
+            result_json = None
+
+            if analysis.result is not None:
+                result_json = json.dumps(
+                    analysis.result,
+                    ensure_ascii=False,
+                )
+
+            conn.execute(
+                """
+                INSERT INTO provider_results(
+                    analysis_run_id,
+                    provider,
+                    model,
+                    result_json,
+                    error,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    analysis.provider,
+                    analysis.model,
+                    result_json,
+                    analysis.error,
+                    created_at,
+                ),
+            )
 
     def _save_events(self, conn, run_id, bundle, created_at):
         for sector in bundle.structured.get("sectors", []):

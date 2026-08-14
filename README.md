@@ -1,200 +1,236 @@
-# AI板块事件雷达 v0.5.0
+# AI板块事件雷达 v0.6.0
 
-V0.5 是第一个带本地 SQLite 数据库的版本。
+V0.6 正式进入 Multi-AI 阶段。
 
-## 新增功能
+## 核心变化
 
-- 自定义板块临时查询
-- 自定义板块长期保存
-- SQLite 本地数据库
-- 分析历史永久保存
-- 历史报告页面
-- Event Pool 基础
-- 新闻事件基础去重
-- 新闻事件详情页
-- V0.4 的 AIProvider / DeepSeek / Web Search 架构继续保留
+- DeepSeek
+- OpenAI
+- Qwen
+- GLM
+- Kimi
+- 同一份联网证据，多模型独立分析
+- 多模型并行调用
+- Consensus Engine
+- 平均事件评分
+- 方向一致度
+- 评分离散度
+- 共识置信度
+- 可选 Judge AI
+- Provider 失败自动降级，不影响其他成功模型
+- SQLite 保存每家模型的独立结果
+- 保持 V0.5 自定义板块、历史报告和 Event Pool
 
-## 自定义板块
+## 为什么 Multi-AI 不能各搜各的？
 
-首页增加：
-
-```text
-自定义板块
-[ 生物医药                    ] [加入本次分析]
-```
-
-可以输入：
-
-```text
-生物医药
-机器人
-创新药
-光伏
-游戏
-低空经济
-```
-
-临时加入只用于当前程序会话。
-
-如果想长期保存：
+如果：
 
 ```text
-板块管理 → 输入板块 → 保存板块
+DeepSeek 看新闻 A
+OpenAI 看新闻 B
+Qwen 看新闻 C
 ```
 
-保存后即使关闭软件、重新启动，也还会存在。
+最终结果不同，无法区分：
 
-## SQLite 是什么？
+- 是模型观点不同？
+- 还是输入事实根本不同？
 
-SQLite 是嵌入式关系型数据库。
-
-它不需要安装 MySQL、PostgreSQL 之类的数据库服务器，
-也不需要用户名、密码、端口。
-
-Python 自带：
-
-```python
-import sqlite3
-```
-
-本软件数据库默认位于：
+因此 V0.6 改成：
 
 ```text
-%APPDATA%\StockEventRadar\stockradar.db
-```
-
-源码和数据库彼此分离，因此：
-
-- Git 不会上传你的本地研究记录
-- 更换项目源码不会自动删除历史
-- 后续打包 EXE 时也适合每个用户保存自己的数据
-
-## V0.5 数据表
-
-### analysis_runs
-
-一行 = 一次完整 AI 分析。
-
-保存：
-
-- 分析时间
-- AI Provider
-- 模型
-- 板块列表
-- 整体摘要
-- 完整 JSON 结果
-- 原始联网研究文本
-
-### events
-
-一行 = 一个新闻/事件。
-
-保存：
-
-- 标题
-- 日期
-- 来源
-- URL
-- AI 分析摘要
-- fingerprint
-- 首次看到时间
-- 最近看到时间
-
-### analysis_events
-
-连接：
-
-```text
-某次分析
-    ↕
-某个事件
-```
-
-并记录这个事件当时关联的板块、影响方向和重要度。
-
-### custom_sectors
-
-保存用户自己的板块。
-
-## 事件去重
-
-V0.5 使用基础 fingerprint：
-
-```text
-标题 + 日期 + 来源
+联网 Research Provider
         ↓
-SHA-256
+同一份 Evidence
         ↓
-fingerprint
+多个 AI 独立分析
+        ↓
+Consensus Engine
 ```
 
-完全相同的事件不会重复插入 events 表。
+这样差异才真正来自模型判断。
 
-注意：这只是 V0.5 的基础去重。
+## Research Provider
 
-未来会升级成：
+当前允许：
 
 ```text
-不同标题但其实是同一事件
+DeepSeek
+OpenAI
+```
+
+默认：
+
+```text
+DeepSeek
+```
+
+研究模型负责：
+
+```text
+联网搜索
+→ 来源
+→ 日期
+→ 新闻
+→ 事件逻辑证据
+```
+
+其他 AI 不重新搜索，直接分析这份共享证据。
+
+## 分析模式
+
+### 单模型快速
+
+```text
+Research Provider
 ↓
-语义聚类 / AI Event Merge
+自己分析
+↓
+结果
 ```
 
-## 安装
+适合快速测试、控制成本。
 
-继续使用：
+### 多模型交叉验证
+
+所有启用且配置了 API Key 的 Provider 会并行分析：
 
 ```text
-D:\miniconda3\envs\stockradar-dev\python.exe
+DeepSeek
+OpenAI
+Qwen
+GLM
+Kimi
 ```
 
-安装依赖：
+某一家失败时，不会让整次任务直接失败；
+只要至少一个分析模型成功，就能继续生成报告。
+
+## Consensus Engine
+
+V0.6 的最终分数不是某个 Judge AI 随意决定。
+
+例如：
+
+```text
+DeepSeek   +72
+OpenAI     +61
+Qwen       +69
+GLM        +55
+Kimi       +66
+```
+
+系统会计算：
+
+- score 均值
+- score 离散度
+- 正 / 中 / 负方向桶
+- 方向一致度
+- 模型平均置信度
+- 共识置信度
+
+最后产生透明的共识结果。
+
+## Judge AI
+
+可选开启：
+
+```text
+AI 设置
+→ 启用 Judge AI
+```
+
+Judge 只能：
+
+- 总结共识
+- 总结分歧
+- 解释为什么评分不同
+
+Judge 不允许覆盖：
+
+- 平均 score
+- agreement
+- dispersion
+- consensus confidence
+
+这样避免“最后一个 AI 一票否决前面全部模型”。
+
+## 数据库
+
+V0.6 在 V0.5 的 SQLite 上新增：
+
+```text
+provider_results
+```
+
+一条历史分析可能对应：
+
+```text
+analysis_run #23
+
+provider_results
+├── DeepSeek
+├── OpenAI
+├── Qwen
+├── GLM
+└── Kimi
+```
+
+方便以后做：
+
+- 模型长期准确性比较
+- 某模型偏乐观/偏悲观统计
+- 成本统计
+- 模型权重学习
+
+## 安装依赖
+
+仍然只需要：
 
 ```powershell
 python -m pip install -r requirements.txt
 ```
 
-本版本没有新增第三方 Python 包。
-
-SQLite 来自 Python 标准库，不需要：
+V0.6 没有要求安装：
 
 ```text
-pip install sqlite
+dashscope
+zhipuai
+kimi SDK
 ```
 
-## API
+因为这些平台都通过 OpenAI-compatible API 接入。
 
-V0.5 不需要新增 API。
+## API 申请与配置
 
-继续使用你之前配置好的 DeepSeek API Key：
+详见：
 
 ```text
-设置 → AI 服务
+API_SETUP.md
 ```
 
-API Key 仍使用 keyring 保存。
+## 推荐第一次测试
 
-## 推荐测试步骤
+1. 保留现有 DeepSeek。
+2. 再申请 Qwen 或 GLM 中任意一个 API Key。
+3. AI 设置里启用 DeepSeek + 第二个 Provider。
+4. 分析模式选择 `多模型交叉验证`。
+5. Judge 暂时关闭。
+6. 首页只分析 `黄金 + 生物医药`。
+7. 查看报告里的“各模型独立判断”和“方向一致度”。
+8. 测试通过后再继续增加 Kimi / OpenAI。
 
-1. 启动软件。
-2. 测试 DeepSeek API。
-3. 首页取消大部分默认板块。
-4. 输入 `生物医药` → 加入本次分析。
-5. 只分析 `黄金 + 生物医药`。
-6. 确认首页出现分析结果。
-7. 打开“历史报告”，确认刚才的分析存在。
-8. 点击该历史记录，确认报告可以恢复。
-9. 打开“新闻源”，确认事件已保存。
-10. 进入“板块管理”，新增 `机器人`。
-11. 关闭软件。
-12. 再次启动，确认 `机器人` 仍然存在。
+## V0.7 计划
 
-## 下一版方向
+下一版重点转向报告产品化：
 
-V0.6：
-
-- OpenAI Provider
-- 多 AI Provider 设置结构
-- 两模型独立分析基础
-- Consensus Engine 第一版
-- Token / 调用成本记录基础
+- 报告中心
+- 30秒摘要
+- 标准报告
+- 深度报告
+- Markdown 导出
+- HTML 导出
+- PDF 导出
+- PNG 长图
+- Multi-AI 共识报告
+- Token / API 调用成本记录

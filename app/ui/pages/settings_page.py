@@ -1,11 +1,13 @@
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -15,8 +17,13 @@ from app.config.settings import AppConfig
 
 
 class SettingsPage(QWidget):
-    save_requested = Signal(str, str, str)
-    test_requested = Signal(str, str, str)
+    save_requested = Signal(object)
+    test_requested = Signal(
+        str,
+        str,
+        str,
+        str,
+    )
 
     def __init__(
         self,
@@ -27,197 +34,517 @@ class SettingsPage(QWidget):
 
         self.config = config
         self.provider_manager = provider_manager
+        self.provider_widgets: dict[
+            str,
+            dict,
+        ] = {}
 
         self._build_ui()
         self._load_config()
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(50, 40, 50, 40)
-        layout.setSpacing(20)
+        layout.setContentsMargins(
+            45,
+            30,
+            45,
+            30,
+        )
+        layout.setSpacing(15)
 
-        title = QLabel("设置")
+        title = QLabel("AI 模型与验证设置")
         title.setObjectName("pageTitle")
 
         description = QLabel(
-            "配置 AI 服务、API Key 和分析模型。"
+            "V0.6 支持 DeepSeek、OpenAI、Qwen、GLM、Kimi。"
+            "多个模型会读取同一份联网证据后独立判断。"
         )
-        description.setObjectName("pageDescription")
+        description.setWordWrap(True)
+        description.setObjectName(
+            "pageDescription"
+        )
 
         layout.addWidget(title)
         layout.addWidget(description)
 
-        api_card = QFrame()
-        api_card.setObjectName("card")
+        # =====================================================
+        # Multi-AI global settings
+        # =====================================================
+        global_card = QFrame()
+        global_card.setObjectName("card")
 
-        card_layout = QVBoxLayout(api_card)
-        card_layout.setContentsMargins(30, 25, 30, 25)
-        card_layout.setSpacing(14)
-
-        api_title = QLabel("AI 服务")
-        api_title.setObjectName("cardTitle")
-        card_layout.addWidget(api_title)
-
-        provider_label = QLabel("AI Provider")
-
-        self.provider_combo = QComboBox()
-        self.provider_combo.addItems(
-            self.provider_manager.provider_names()
+        global_layout = QVBoxLayout(
+            global_card
         )
-        self.provider_combo.currentTextChanged.connect(
-            self._provider_changed
+        global_layout.setContentsMargins(
+            25,
+            20,
+            25,
+            20,
         )
+        global_layout.setSpacing(10)
 
-        card_layout.addWidget(provider_label)
-        card_layout.addWidget(self.provider_combo)
-
-        api_key_label = QLabel("API Key")
-
-        self.api_key_input = QLineEdit()
-        self.api_key_input.setEchoMode(
-            QLineEdit.EchoMode.Password
+        global_title = QLabel(
+            "分析流程"
+        )
+        global_title.setObjectName(
+            "cardTitle"
+        )
+        global_layout.addWidget(
+            global_title
         )
 
-        card_layout.addWidget(api_key_label)
-        card_layout.addWidget(self.api_key_input)
+        research_row = QHBoxLayout()
 
-        model_label = QLabel("模型")
-
-        self.model_combo = QComboBox()
-
-        card_layout.addWidget(model_label)
-        card_layout.addWidget(self.model_combo)
-
-        self.api_status_label = QLabel("尚未测试连接")
-        self.api_status_label.setObjectName("statusLabel")
-        card_layout.addWidget(self.api_status_label)
-
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-
-        self.test_api_button = QPushButton("测试连接")
-        self.test_api_button.setObjectName("secondaryButton")
-        self.test_api_button.setCursor(
-            Qt.CursorShape.PointingHandCursor
-        )
-        self.test_api_button.clicked.connect(
-            self._emit_test
+        research_row.addWidget(
+            QLabel("联网研究 Provider")
         )
 
-        self.save_settings_button = QPushButton("保存设置")
-        self.save_settings_button.setObjectName("primaryButton")
-        self.save_settings_button.setCursor(
-            Qt.CursorShape.PointingHandCursor
+        self.research_combo = (
+            QComboBox()
         )
-        self.save_settings_button.clicked.connect(
+        self.research_combo.addItems(
+            self.provider_manager
+            .research_provider_names()
+        )
+
+        research_row.addWidget(
+            self.research_combo,
+            1,
+        )
+
+        research_row.addWidget(
+            QLabel("分析模式")
+        )
+
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItem(
+            "单模型快速",
+            "single",
+        )
+        self.mode_combo.addItem(
+            "多模型交叉验证",
+            "multi",
+        )
+
+        research_row.addWidget(
+            self.mode_combo,
+            1,
+        )
+
+        global_layout.addLayout(
+            research_row
+        )
+
+        judge_row = QHBoxLayout()
+
+        self.judge_checkbox = (
+            QCheckBox(
+                "启用 Judge AI 汇总共识与分歧"
+            )
+        )
+        judge_row.addWidget(
+            self.judge_checkbox
+        )
+
+        judge_row.addStretch()
+
+        judge_row.addWidget(
+            QLabel("Judge Provider")
+        )
+
+        self.judge_combo = (
+            QComboBox()
+        )
+        self.judge_combo.addItems(
+            self.provider_manager
+            .provider_names()
+        )
+        judge_row.addWidget(
+            self.judge_combo
+        )
+
+        global_layout.addLayout(
+            judge_row
+        )
+
+        hint = QLabel(
+            "建议：日常先用 2~3 个模型。"
+            "Judge 会额外增加一次 API 调用；"
+            "它只总结分歧，不修改数学聚合得到的评分。"
+        )
+        hint.setWordWrap(True)
+        hint.setObjectName("statusLabel")
+        global_layout.addWidget(hint)
+
+        layout.addWidget(global_card)
+
+        # =====================================================
+        # Provider tabs
+        # =====================================================
+        self.tabs = QTabWidget()
+
+        for provider_name in (
+            self.provider_manager
+            .provider_names()
+        ):
+            tab = self._create_provider_tab(
+                provider_name
+            )
+            self.tabs.addTab(
+                tab,
+                provider_name,
+            )
+
+        layout.addWidget(
+            self.tabs,
+            1,
+        )
+
+        save_row = QHBoxLayout()
+        save_row.addStretch()
+
+        save_button = QPushButton(
+            "保存全部设置"
+        )
+        save_button.setObjectName(
+            "primaryButton"
+        )
+        save_button.clicked.connect(
             self._emit_save
         )
 
-        button_layout.addWidget(self.test_api_button)
-        button_layout.addWidget(self.save_settings_button)
-        card_layout.addLayout(button_layout)
+        save_row.addWidget(save_button)
+        layout.addLayout(save_row)
 
-        layout.addWidget(api_card)
-
-        info_card = QFrame()
-        info_card.setObjectName("card")
-
-        info_layout = QVBoxLayout(info_card)
-        info_layout.setContentsMargins(30, 20, 30, 20)
-
-        info_title = QLabel("V0.5 数据与 Provider 架构")
-        info_title.setObjectName("cardTitle")
-
-        info_text = QLabel(
-            "当前只启用 DeepSeek，但软件已经改成统一 AIProvider 架构。"
-            "后续增加 OpenAI、Qwen、GLM 时，不需要重写首页分析逻辑。"
+    def _create_provider_tab(
+        self,
+        provider_name: str,
+    ) -> QWidget:
+        info = self.provider_manager.info(
+            provider_name
         )
-        info_text.setWordWrap(True)
-        info_text.setObjectName("pageDescription")
 
-        info_layout.addWidget(info_title)
-        info_layout.addWidget(info_text)
+        tab = QWidget()
 
-        layout.addWidget(info_card)
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(
+            20,
+            20,
+            20,
+            20,
+        )
+        layout.setSpacing(12)
+
+        enabled = QCheckBox(
+            "参与多模型独立分析"
+        )
+
+        if info.supports_web_search:
+            enabled.setText(
+                "参与多模型独立分析"
+                "（也可作为联网研究 Provider）"
+            )
+
+        layout.addWidget(enabled)
+
+        model_label = QLabel("模型")
+        model_combo = QComboBox()
+        model_combo.setEditable(True)
+        model_combo.addItems(
+            list(info.models)
+        )
+
+        layout.addWidget(model_label)
+        layout.addWidget(model_combo)
+
+        base_label = QLabel("Base URL")
+        base_input = QLineEdit()
+
+        layout.addWidget(base_label)
+        layout.addWidget(base_input)
+
+        api_label = QLabel("API Key")
+        api_input = QLineEdit()
+        api_input.setEchoMode(
+            QLineEdit.EchoMode.Password
+        )
+
+        layout.addWidget(api_label)
+        layout.addWidget(api_input)
+
+        status = QLabel("尚未测试连接")
+        status.setObjectName("statusLabel")
+        layout.addWidget(status)
+
+        button_row = QHBoxLayout()
+        button_row.addStretch()
+
+        test_button = QPushButton(
+            "测试此 Provider"
+        )
+        test_button.setObjectName(
+            "secondaryButton"
+        )
+        test_button.clicked.connect(
+            lambda checked=False, name=provider_name:
+            self._emit_test(name)
+        )
+
+        button_row.addWidget(test_button)
+        layout.addLayout(button_row)
+
+        if provider_name == "Qwen":
+            qwen_hint = QLabel(
+                "千问提示：不同地域/计费模式的 API Host "
+                "可能不同。如果控制台给你的 API Host "
+                "与默认值不同，请把 Base URL 改成控制台显示的地址。"
+            )
+            qwen_hint.setWordWrap(True)
+            qwen_hint.setObjectName(
+                "statusLabel"
+            )
+            layout.addWidget(qwen_hint)
+
         layout.addStretch()
 
+        self.provider_widgets[
+            provider_name
+        ] = {
+            "enabled": enabled,
+            "model": model_combo,
+            "base_url": base_input,
+            "api_key": api_input,
+            "status": status,
+            "test_button": test_button,
+        }
+
+        return tab
+
     def _load_config(self):
-        if self.config.provider in self.provider_manager.provider_names():
-            self.provider_combo.setCurrentText(
-                self.config.provider
+        self.research_combo.setCurrentText(
+            self.config.research_provider
+        )
+
+        mode_index = (
+            self.mode_combo.findData(
+                self.config.analysis_mode
+            )
+        )
+
+        if mode_index >= 0:
+            self.mode_combo.setCurrentIndex(
+                mode_index
             )
 
-        self._refresh_models(
-            preferred_model=self.config.model
+        self.judge_checkbox.setChecked(
+            self.config.judge_enabled
         )
-        self._refresh_api_key_placeholder()
+        self.judge_combo.setCurrentText(
+            self.config.judge_provider
+        )
 
-    def _provider_changed(self, provider_name: str):
-        self._refresh_models()
-        self._refresh_api_key_placeholder()
+        for provider_name, widgets in (
+            self.provider_widgets.items()
+        ):
+            info = (
+                self.provider_manager.info(
+                    provider_name
+                )
+            )
+            saved = (
+                self.config
+                .get_provider_config(
+                    provider_name
+                )
+            )
 
-    def _refresh_models(self, preferred_model: str | None = None):
-        provider = self.provider_combo.currentText()
-        models = self.provider_manager.models_for(provider)
+            widgets[
+                "enabled"
+            ].setChecked(
+                bool(
+                    saved.get(
+                        "enabled",
+                        False,
+                    )
+                )
+            )
 
-        self.model_combo.blockSignals(True)
-        self.model_combo.clear()
-        self.model_combo.addItems(models)
+            model = saved.get(
+                "model",
+                info.default_model,
+            )
 
-        if preferred_model in models:
-            self.model_combo.setCurrentText(preferred_model)
+            widgets[
+                "model"
+            ].setCurrentText(
+                model
+            )
 
-        self.model_combo.blockSignals(False)
+            widgets[
+                "base_url"
+            ].setText(
+                saved.get(
+                    "base_url",
+                    info.default_base_url,
+                )
+            )
 
-    def _refresh_api_key_placeholder(self):
-        provider = self.provider_combo.currentText()
+            self._refresh_key_placeholder(
+                provider_name
+            )
 
-        if not provider:
-            return
+    def _refresh_key_placeholder(
+        self,
+        provider_name: str,
+    ):
+        widget = self.provider_widgets[
+            provider_name
+        ]["api_key"]
 
-        if self.config.get_api_key(provider):
-            self.api_key_input.setPlaceholderText(
-                "API Key 已保存，如需修改请重新输入"
+        if self.config.has_api_key(
+            provider_name
+        ):
+            widget.setPlaceholderText(
+                "API Key 已安全保存；留空表示继续使用原 Key"
             )
         else:
-            self.api_key_input.setPlaceholderText(
-                f"请输入 {provider} API Key"
+            widget.setPlaceholderText(
+                f"请输入 {provider_name} API Key"
             )
 
-    def values(self) -> tuple[str, str, str]:
-        return (
-            self.provider_combo.currentText(),
-            self.model_combo.currentText(),
-            self.api_key_input.text().strip(),
-        )
+    def collect_settings(self) -> dict:
+        providers = {}
+
+        for provider_name, widgets in (
+            self.provider_widgets.items()
+        ):
+            providers[
+                provider_name
+            ] = {
+                "enabled": (
+                    widgets[
+                        "enabled"
+                    ].isChecked()
+                ),
+                "model": (
+                    widgets[
+                        "model"
+                    ].currentText().strip()
+                ),
+                "base_url": (
+                    widgets[
+                        "base_url"
+                    ].text().strip()
+                ),
+                "api_key": (
+                    widgets[
+                        "api_key"
+                    ].text().strip()
+                ),
+            }
+
+        return {
+            "research_provider": (
+                self.research_combo
+                .currentText()
+            ),
+            "analysis_mode": (
+                self.mode_combo
+                .currentData()
+            ),
+            "judge_enabled": (
+                self.judge_checkbox
+                .isChecked()
+            ),
+            "judge_provider": (
+                self.judge_combo
+                .currentText()
+            ),
+            "providers": providers,
+        }
 
     def _emit_save(self):
-        self.save_requested.emit(*self.values())
+        self.save_requested.emit(
+            self.collect_settings()
+        )
 
-    def _emit_test(self):
-        self.test_requested.emit(*self.values())
+    def _emit_test(
+        self,
+        provider_name: str,
+    ):
+        widgets = self.provider_widgets[
+            provider_name
+        ]
+
+        self.test_requested.emit(
+            provider_name,
+            widgets[
+                "api_key"
+            ].text().strip(),
+            widgets[
+                "model"
+            ].currentText().strip(),
+            widgets[
+                "base_url"
+            ].text().strip(),
+        )
 
     def mark_saved(self):
-        self.api_key_input.clear()
-        self._refresh_api_key_placeholder()
+        for provider_name, widgets in (
+            self.provider_widgets.items()
+        ):
+            widgets[
+                "api_key"
+            ].clear()
+            self._refresh_key_placeholder(
+                provider_name
+            )
 
-    def set_test_running(self, running: bool):
-        self.test_api_button.setEnabled(not running)
-        self.test_api_button.setText(
-            "连接中..." if running else "测试连接"
+    def set_test_running(
+        self,
+        provider_name: str,
+        running: bool,
+    ):
+        widgets = self.provider_widgets[
+            provider_name
+        ]
+        button = widgets[
+            "test_button"
+        ]
+
+        button.setEnabled(
+            not running
+        )
+        button.setText(
+            "连接中..."
+            if running
+            else "测试此 Provider"
         )
 
         if running:
-            self.api_status_label.setText(
-                "正在连接 AI 服务..."
+            widgets[
+                "status"
+            ].setText(
+                "正在连接..."
             )
 
-    def show_test_success(self):
-        self.api_status_label.setText(
+    def show_test_success(
+        self,
+        provider_name: str,
+    ):
+        self.provider_widgets[
+            provider_name
+        ]["status"].setText(
             "✓ API 连接成功"
         )
 
-    def show_test_error(self):
-        self.api_status_label.setText(
+    def show_test_error(
+        self,
+        provider_name: str,
+    ):
+        self.provider_widgets[
+            provider_name
+        ]["status"].setText(
             "✕ API 连接失败"
         )

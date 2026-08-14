@@ -46,7 +46,7 @@ class DashboardPage(QWidget):
         title.setObjectName("pageTitle")
 
         description = QLabel(
-            "选择默认板块，也可以输入任意自定义A股主题，例如“生物医药”。"
+            "选择板块后，由一个联网研究模型取证，再由多个AI基于同一证据独立分析并计算共识。"
         )
         description.setObjectName("pageDescription")
 
@@ -273,7 +273,7 @@ class DashboardPage(QWidget):
                 <div style="padding:20px;">
                     <h3>正在分析...</h3>
                     <p>
-                        AI 正在联网搜索近期事件并建立传导链。
+                        正在联网取证，并让多个 AI 基于同一证据独立分析。
                     </p>
                 </div>
                 """
