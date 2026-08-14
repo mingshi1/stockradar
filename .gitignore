@@ -1,0 +1,49 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Conda
+.conda/
+
+# IDE
+.vscode/
+.idea/
+
+# Build
+build/
+dist/
+*.spec
+
+# Logs
+*.log
+logs/
+
+# Local database / runtime data
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Local settings
+settings.json
+.env
+.env.*
+
+# API / secrets
+*.key
+secrets.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test / cache
+.pytest_cache/
+.mypy_cache/
+.coverage
