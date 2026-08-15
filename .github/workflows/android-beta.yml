@@ -2,20 +2,15 @@ name: Android Beta Build
 
 on:
   workflow_dispatch:
-    inputs:
-      pyside_wheel_url:
-        description: "Direct URL to the official PySide6 Android aarch64 wheel"
-        required: true
-        type: string
-      shiboken_wheel_url:
-        description: "Direct URL to the matching official shiboken6 Android aarch64 wheel"
-        required: true
-        type: string
-      pyside_branch:
-        description: "Matching Qt for Python branch, e.g. 6.10"
-        required: true
-        default: "6.10"
-        type: string
+  push:
+    branches:
+      - "dev-v1.0-*"
+
+env:
+  QT_FOR_PYTHON_VERSION: "6.11.1"
+  QT_FOR_PYTHON_BRANCH: "6.11"
+  PYSIDE_ANDROID_WHEEL_URL: "https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.11.1-6.11.1-cp311-cp311-android_aarch64.whl"
+  SHIBOKEN_ANDROID_WHEEL_URL: "https://download.qt.io/official_releases/QtForPython/shiboken6/shiboken6-6.11.1-6.11.1-cp311-cp311-android_aarch64.whl"
 
 jobs:
   android-beta:
@@ -23,51 +18,96 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: "3.11"
+          cache: "pip"
 
       - name: Install build environment
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements-android.txt
+          python -m pip check
+          python -c "import PySide6, PySide6.QtCore; print('PySide6', PySide6.__version__); print('Qt', PySide6.QtCore.__version__)"
 
-      - name: Download Android wheels
+      - name: Download official Android ARM64 wheels
+        shell: bash
         run: |
+          set -euxo pipefail
           mkdir -p android-wheels
-          curl -L "${{ inputs.pyside_wheel_url }}" -o android-wheels/PySide6-android.whl
-          curl -L "${{ inputs.shiboken_wheel_url }}" -o android-wheels/shiboken6-android.whl
+
+          curl --fail --location --retry 3 \
+            "$PYSIDE_ANDROID_WHEEL_URL" \
+            -o "android-wheels/PySide6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
+
+          curl --fail --location --retry 3 \
+            "$SHIBOKEN_ANDROID_WHEEL_URL" \
+            -o "android-wheels/shiboken6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
+
+          ls -lh android-wheels
+
+          test -s "android-wheels/PySide6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
+          test -s "android-wheels/shiboken6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
 
       - name: Download matching Android SDK and NDK
+        shell: bash
         run: |
-          git clone --depth 1 --branch "${{ inputs.pyside_branch }}" \
+          set -euxo pipefail
+
+          git clone --depth 1 --branch "$QT_FOR_PYTHON_BRANCH" \
             https://code.qt.io/pyside/pyside-setup
+
           python pyside-setup/tools/cross_compile_android/main.py \
             --download-only \
             --skip-update \
             --auto-accept-license
 
-      - name: Build APK Beta
+          ls -la "$HOME/.pyside6-android-deploy" || true
+
+      - name: Build Android APK Beta
+        shell: bash
         run: |
+          set -euxo pipefail
           chmod +x scripts/build_android.sh
+
           ./scripts/build_android.sh \
-            "$PWD/android-wheels/PySide6-android.whl" \
-            "$PWD/android-wheels/shiboken6-android.whl"
+            "$PWD/android-wheels/PySide6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl" \
+            "$PWD/android-wheels/shiboken6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
 
       - name: Collect APK/AAB
         shell: bash
         run: |
+          set -euxo pipefail
           mkdir -p android-output
-          find . -maxdepth 4 \( -name "*.apk" -o -name "*.aab" \) \
+
+          find . -maxdepth 6 \( -name "*.apk" -o -name "*.aab" \) \
             -not -path "./android-output/*" \
-            -exec cp {} android-output/ \;
-          ls -la android-output
+            -exec cp -v {} android-output/ \;
+
+          ls -lah android-output
+
+          if ! find android-output -type f \( -name "*.apk" -o -name "*.aab" \) | grep -q .; then
+            echo "No APK/AAB was produced."
+            exit 1
+          fi
 
       - name: Upload Android Beta
         uses: actions/upload-artifact@v4
         with:
-          name: StockEventRadar-Android-Beta-1.0.0-rc3
+          name: StockEventRadar-Android-Beta-1.0.0-rc4
+          if-no-files-found: error
           path: android-output/*
+
+      - name: Upload Android diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4
+          if-no-files-found: ignore
+          path: |
+            pysidedeploy.spec
+            .buildozer/**
+            deployment/**

@@ -3,6 +3,9 @@ name: Windows Release Build
 on:
   workflow_dispatch:
   push:
+    branches:
+      - "main"
+      - "dev-v1.0-*"
     tags:
       - "v*"
 
@@ -15,25 +18,37 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: "pip"
 
-      - name: Install dependencies
+      - name: Install deterministic dependencies
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m pip install -r requirements-build.txt
+          python -m pip check
 
-      - name: Build Windows EXE
+      - name: Build Windows EXE with MSVC environment
         shell: pwsh
         run: |
-          .\scripts\build_windows.ps1 -SkipInstaller
+          .\scripts\build_windows_ci.ps1
+
+      - name: Upload Windows build diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: StockEventRadar-Windows-Diagnostics-1.0.0-rc4
+          if-no-files-found: ignore
+          path: |
+            pysidedeploy.spec
+            deployment/**
+            dist/**
 
       - name: Install Inno Setup
         shell: pwsh
@@ -43,16 +58,16 @@ jobs:
       - name: Build Installer
         shell: pwsh
         run: |
-          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          & $iscc "installer\StockEventRadar.iss"
+          .\scripts\build_installer.ps1
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: StockEventRadar-Windows-1.0.0-rc3
+          name: StockEventRadar-Windows-1.0.0-rc4
+          if-no-files-found: error
           path: |
             dist/StockEventRadar.exe
-            installer/output/StockEventRadar-Setup-1.0.0-rc3.exe
+            installer/output/StockEventRadar-Setup-1.0.0-rc4.exe
 
       - name: Publish GitHub Release asset
         if: startsWith(github.ref, 'refs/tags/')
@@ -61,11 +76,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "${env:GITHUB_REF_NAME}"
+
           gh release view $tag *> $null
+
           if ($LASTEXITCODE -ne 0) {
             gh release create $tag --title $tag --generate-notes
           }
+
           gh release upload $tag `
             "dist/StockEventRadar.exe" `
-            "installer/output/StockEventRadar-Setup-1.0.0-rc3.exe" `
+            "installer/output/StockEventRadar-Setup-1.0.0-rc4.exe" `
             --clobber

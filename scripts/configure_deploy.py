@@ -5,6 +5,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "pysidedeploy.spec"
 DIST_DIR = ROOT / "dist"
+DEPLOYMENT_DIR = ROOT / "deployment"
+NUITKA_REPORT = DEPLOYMENT_DIR / "nuitka-report.xml"
 
 
 def main():
@@ -14,9 +16,11 @@ def main():
             "pyside6-deploy main.py --init --name StockEventRadar -f"
         )
 
-    # pyside6-deploy finalize() copies the built executable to exec_directory.
-    # Ensure that destination exists before deployment starts.
     DIST_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    DEPLOYMENT_DIR.mkdir(
         parents=True,
         exist_ok=True,
     )
@@ -64,23 +68,33 @@ def main():
     existing = config.get(
         "nuitka",
         "extra_args",
-        fallback="--quiet --noinclude-qt-translations=True",
+        fallback="--noinclude-qt-translations=True",
     )
+
+    # RC4: GitHub Actions needs the real Nuitka error, so do not suppress
+    # compiler output with --quiet.
+    tokens = [
+        token
+        for token in existing.split()
+        if token != "--quiet"
+    ]
 
     additions = [
         "--windows-console-mode=disable",
         "--include-data-dir=resources=resources",
         "--include-data-files=VERSION=VERSION",
+        "--assume-yes-for-downloads",
+        f"--report={NUITKA_REPORT}",
     ]
 
     for item in additions:
-        if item not in existing:
-            existing += " " + item
+        if item not in tokens:
+            tokens.append(item)
 
     config.set(
         "nuitka",
         "extra_args",
-        existing.strip(),
+        " ".join(tokens).strip(),
     )
 
     with SPEC.open(
@@ -89,14 +103,9 @@ def main():
     ) as handle:
         config.write(handle)
 
-    print(
-        "Configured:",
-        SPEC,
-    )
-    print(
-        "Executable output directory:",
-        DIST_DIR,
-    )
+    print("Configured:", SPEC)
+    print("Executable output directory:", DIST_DIR)
+    print("Nuitka diagnostic report:", NUITKA_REPORT)
 
 
 if __name__ == "__main__":

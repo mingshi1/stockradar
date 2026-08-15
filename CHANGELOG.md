@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.0.0-rc4
+
+### Windows CI
+- GitHub `windows-latest` 构建前显式加载 Visual Studio 2022 Developer Command Prompt 环境。
+- 构建前验证 `cl.exe` 与 `dumpbin.exe`。
+- 固定 PySide6 6.11.1，并将 Nuitka 限定为 4.0~4.1 系列，减少 CI 与本机的版本漂移。
+- 移除 Nuitka `--quiet`，失败时显示真正的编译错误。
+- 生成 `deployment/nuitka-report.xml`。
+- GitHub 构建失败时自动上传 deployment / spec 诊断 Artifact。
+- Checkout / Setup Python 更新到 Node 24 版本的 GitHub Actions。
+- Windows 工作流支持 `dev-v1.0-*` 分支 push 测试，不必创建正式 tag。
+- 新增 `scripts/build_windows_ci.ps1` 和 `scripts/build_installer.ps1`。
+
+### Android CI
+- Android Host Python 改为 3.11，与官方 Android wheel 的 cp311 ABI 对齐。
+- 固定 Qt for Python / PySide6 6.11.1。
+- ARM64 PySide6 / Shiboken6 官方 wheel URL 内置到 workflow，不再要求手工填写。
+- 使用 Qt for Python 6.11 分支下载匹配的 Android SDK / NDK。
+- Android deploy 开启 verbose 和 keep-deployment-files，便于失败诊断。
+- APK/AAB 未生成时 workflow 明确失败，而不是上传空 Artifact。
+
+### Release discipline
+- RC 阶段建议只 push `dev-v1.0-rc4`，不要创建 `v1.0.0` 正式 tag。
+- Windows + Android 真机测试通过后再创建正式 v1.0.0 Release。
+
 ## 1.0.0-rc3
 
 ### Changed

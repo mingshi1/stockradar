@@ -1,5 +1,6 @@
 param(
     [switch]$SkipInstaller,
+    [switch]$SkipDependencyInstall,
     [string]$BuildRoot = "D:\StockEventRadarBuild"
 )
 
@@ -9,7 +10,7 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectRoot
 
 Write-Host "=========================================="
-Write-Host " StockEventRadar v1.0.0-rc3 Windows Build"
+Write-Host " StockEventRadar v1.0.0-rc4 Windows Build"
 Write-Host "=========================================="
 Write-Host ""
 
@@ -38,8 +39,18 @@ Write-Host "pip cache:"
 Write-Host "  $PipCacheDir"
 Write-Host ""
 
-python -m pip install -r requirements.txt
-python -m pip install -r requirements-build.txt
+if (-not $SkipDependencyInstall) {
+    Write-Host "[0/4] Installing deterministic build dependencies..."
+    python -m pip install -r requirements.txt
+    python -m pip install -r requirements-build.txt
+}
+
+Write-Host "Python:"
+python -c "import sys; print(sys.executable); print(sys.version)"
+Write-Host "PySide6:"
+python -c "import PySide6, PySide6.QtCore; print(PySide6.__version__); print(PySide6.__file__); print('Qt', PySide6.QtCore.__version__)"
+Write-Host "Nuitka:"
+python -m nuitka --version
 
 $DistDir = Join-Path $ProjectRoot "dist"
 $DeploymentDir = Join-Path $ProjectRoot "deployment"
@@ -60,11 +71,23 @@ if (Test-Path "pysidedeploy.spec") {
 Write-Host "[1/4] Creating deployment spec..."
 pyside6-deploy main.py --init --name StockEventRadar -f
 
+if ($LASTEXITCODE -ne 0) {
+    throw "pyside6-deploy --init failed with exit code $LASTEXITCODE"
+}
+
 Write-Host "[2/4] Configuring deployment..."
 python scripts/configure_deploy.py
 
+if ($LASTEXITCODE -ne 0) {
+    throw "configure_deploy.py failed with exit code $LASTEXITCODE"
+}
+
 Write-Host "[3/4] Building EXE with pyside6-deploy / Nuitka..."
 pyside6-deploy -c pysidedeploy.spec -f
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "pyside6-deploy failed with exit code $LASTEXITCODE. See the Nuitka output above and deployment\nuitka-report.xml when available."
+}
 
 if (-not (Test-Path $Exe)) {
     $FallbackExe = Join-Path $DeploymentDir "main.exe"
@@ -91,32 +114,5 @@ if ($SkipInstaller) {
     exit 0
 }
 
-Write-Host "[4/4] Looking for Inno Setup..."
-
-$IsccCandidates = @(
-    "D:\Inno Setup 6\ISCC.exe",
-    "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
-    "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
-    "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-)
-
-$Iscc = $null
-
-foreach ($Candidate in $IsccCandidates) {
-    if (Test-Path $Candidate) {
-        $Iscc = $Candidate
-        break
-    }
-}
-
-if (-not $Iscc) {
-    Write-Warning "Inno Setup 6 was not found."
-    Write-Warning "The EXE was built successfully."
-    Write-Warning "Install Inno Setup 6 and rerun to create Setup.exe."
-    exit 0
-}
-
-& $Iscc "installer\StockEventRadar.iss"
-
-Write-Host ""
-Write-Host "Installer build complete."
+Write-Host "[4/4] Building installer..."
+& "$PSScriptRoot\build_installer.ps1"
