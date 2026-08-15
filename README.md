@@ -1,427 +1,453 @@
-# AI板块事件雷达 v0.8.0
+# AI板块事件雷达 v0.9.3
 
-V0.8 的主题是：
+V0.9 的主题是：
 
-> 分析过程可见 + 长期数据统计
-
-本版本不再扩张新的 AI Provider，而是把已经存在的 Multi-AI 流程做成
-更适合日常使用、调试和长期观察的系统。
+> 从开发项目进入可发布软件阶段。
 
 ---
 
-# V0.8 新增
+# V0.9 新增
 
-## 1. 实时分析进度
+## 首次启动向导
 
-“今日分析”页面新增：
-
-- 总体阶段进度条
-- 当前任务说明
-- 联网 Research Provider 状态
-- 每个独立分析模型状态
-- Judge 状态
-- 每个 Provider 耗时
-- 每个 Provider Token
-- 每个 Provider 可选成本估算
-
-重要：
-
-进度条代表的是软件可以真实观察到的流水线阶段，例如：
+第一次启动会出现：
 
 ```text
-准备
-→ 联网研究
-→ 多模型独立分析
-→ Consensus
-→ Judge
-→ SQLite 保存
+欢迎
+→ 配置第一个联网 AI
+→ 选择分析模式
+→ 使用说明
+→ 主界面
 ```
 
-它不声称知道模型内部“思考到 63%”。
+用户不再需要一上来就理解：
+
+```text
+Research Provider
+Judge
+Base URL
+Consensus
+```
 
 ---
 
-# 2. Provider 用量与性能记录
+## 响应式导航
 
-SQLite 新增：
+桌面宽屏：
 
 ```text
-provider_calls
+左侧 Sidebar
++
+主内容
 ```
 
-每次调用保存：
+窗口变窄 / Android Beta：
 
-- phase
-- provider
-- model
-- status
-- duration_ms
-- input_tokens
-- output_tokens
-- total_tokens
-- estimated_cost
-- error
-- created_at
+```text
+顶部导航
++
+主内容
+```
 
-因此“数据统计”页面可以显示：
+系统设置可以强制：
 
-- Provider 累计调用次数
-- 成功率
-- 平均耗时
-- Input Tokens
-- Output Tokens
-- Total Tokens
-- 用户配置价格下的累计成本估算
+```text
+自动
+桌面
+移动 / 窄屏
+```
 
-注意：
-
-并非所有 OpenAI-compatible Provider / 请求类型都一定返回 Token usage。
-
-如果 API 没有返回，程序会记录 0，而不会编造数字。
+V0.9 是移动端 Beta UI 基础，V1.0 再继续做最终手机体验优化。
 
 ---
 
-# 3. 可配置 Token 单价
-
-进入：
-
-```text
-AI 设置
-```
-
-每家 Provider 都新增：
-
-```text
-输入单价 / 1M input tokens
-输出单价 / 1M output tokens
-```
-
-默认全部为：
-
-```text
-0
-```
-
-即：
-
-```text
-不估算成本
-```
-
-原因是模型 API 价格变化很快，本软件不会把某一天的官网价格硬编码成永久真相。
-
-你可以按照自己实际账号的计费页面填写。
-
-例如你决定全部使用人民币作为货币单位，那么所有 Provider 都保持人民币即可。
-
----
-
-# 4. 数据统计与板块历史趋势
+## 系统与数据
 
 左侧新增：
 
 ```text
-数据统计
+系统与数据
 ```
 
 包括：
 
-### 板块事件评分趋势
-
-SQLite 会读取过去分析结果，例如：
-
-```text
-黄金
-
-08-10   +18
-08-11   +35
-08-12   +62
-08-13   +55
-08-14   +70
-```
-
-绘制 -100 ~ +100 的趋势图。
-
-同时显示：
-
-- 样本次数
-- 首期评分
-- 最新评分
-- 评分变化
-- 平均 AI 一致度
-
-趋势图使用 PySide6 QPainter 自己绘制，没有新增 matplotlib。
-
-### Provider 性能
-
-表格显示：
-
-```text
-Provider
-调用
-成功率
-平均耗时
-Input Tokens
-Output Tokens
-Total Tokens
-估算成本
-```
+- SQLite Schema Version
+- 数据库路径
+- 备份数据库
+- 恢复数据库
+- 打开数据目录
+- 打开日志目录
+- 响应式 UI 模式
+- 重新运行首次启动向导
+- API Key 持久化状态
 
 ---
 
-# 5. 晨报 / 报告归档
+## SQLite Migration
 
-V0.7 已经可以生成报告。
-
-V0.8 新增 SQLite：
+V0.9 正式加入数据库结构版本：
 
 ```text
-saved_reports
+PRAGMA user_version
+schema_migrations
 ```
 
-当你：
+当前：
 
 ```text
-晨报 / 报告中心
-→ 生成并归档
+Schema Version 1
 ```
 
-报告会同时存入数据库。
-
-同一个：
-
-```text
-analysis_run
-+
-report_type
-```
-
-再次生成时会更新原归档，而不是无限产生重复记录。
-
-支持归档：
-
-- 30秒晨报
-- 标准报告
-- Multi-AI 共识报告
-- 深度研究报告
-
-并且仍支持：
-
-- 复制摘要
-- Markdown
-- HTML
-- PDF
-- PNG 长图
+这为 V1.0 和未来升级旧数据库建立正式 migration 基础。
 
 ---
 
-# 6. 运行日志
+## 数据库备份 / 恢复
 
-V0.8 增加 Rotating Log。
+不再简单复制正在使用的数据库。
 
-日志位置：
+程序使用 SQLite backup API。
 
-```text
-%APPDATA%\StockEventRadar\logs\app.log
-```
-
-最多保留：
-
-```text
-app.log
-app.log.1
-app.log.2
-app.log.3
-```
-
-每份约 2 MB。
-
-以后如果软件出现：
-
-```text
-某模型失败
-数据库写入错误
-报告导出失败
-```
-
-除了界面提示，也能从日志定位问题。
-
----
-
-# 7. 失败隔离
-
-Multi-AI 继续并发运行。
-
-例如：
-
-```text
-DeepSeek  ✓
-Qwen      ✓
-GLM       ✕
-Doubao    ✓
-MiniMax   ✓
-```
-
-只要至少有一个分析模型成功，系统仍可以继续：
-
-```text
-Consensus
-→ 报告
-→ SQLite
-```
-
-失败模型会在任务进度和最终报告中明确标记。
-
-AI Provider 默认网络请求仍有超时限制，因此单个请求不会无限等待。
-
----
-
-# V0.8 数据库
-
-目前包含：
+恢复前会检查：
 
 ```text
 analysis_runs
 events
-analysis_events
 custom_sectors
-provider_results
-provider_calls
-saved_reports
 ```
 
-旧 V0.5 / V0.6 / V0.7 数据库可以继续使用。
-
-程序启动时：
-
-```sql
-CREATE TABLE IF NOT EXISTS ...
-```
-
-自动补上 V0.8 新表，不需要手动迁移 SQL。
+等关键表是否存在。
 
 ---
 
-# 安装
+## Windows 应用图标
 
-继续使用开发环境：
+新增：
 
 ```text
-D:\miniconda3\envs\stockradar-dev\python.exe
+resources/app_icon.png
+resources/app_icon.ico
 ```
 
-执行：
+Windows EXE / Installer 构建会使用 `.ico`。
+
+---
+
+# Windows 打包
+
+提供：
+
+```text
+scripts/build_windows.ps1
+scripts/configure_deploy.py
+installer/StockEventRadar.iss
+requirements-build.txt
+```
+
+发布流程：
+
+```text
+PySide6 source
+→ pyside6-deploy
+→ Nuitka
+→ StockEventRadar.exe
+→ Inno Setup
+→ StockEventRadar-Setup-0.9.0.exe
+```
+
+---
+
+# GitHub Actions
+
+新增：
+
+```text
+.github/workflows/windows-release.yml
+.github/workflows/android-beta.yml
+```
+
+Windows 可以：
+
+```text
+手动触发
+```
+
+或者：
+
+```text
+git tag v0.9.3
+git push origin v0.9.3
+```
+
+触发 Release 构建。
+
+---
+
+# Android Beta
+
+V0.9 包含 Android Beta 构建准备：
+
+```text
+requirements-android.txt
+scripts/build_android.sh
+android-beta.yml
+```
+
+重要：
+
+Android Beta 的 API Key 当前只保存在运行内存中。
+
+这是刻意的安全取舍：
+
+```text
+不安全地明文永久存储 Key
+```
+
+和
+
+```text
+Beta 阶段重新输入 Key
+```
+
+之间，V0.9 选择后者。
+
+V1.0 再评估 Android Keystore 原生安全存储。
+
+---
+
+# 已有功能全部保留
+
+- DeepSeek
+- Qwen
+- GLM
+- Kimi
+- Doubao
+- MiniMax
+- 同证据 Multi-AI
+- Consensus Engine
+- Judge
+- 自定义板块
+- Event Pool
+- SQLite 历史
+- 实时进度
+- Token / 成本
+- Provider 性能统计
+- 板块趋势
+- 晨报归档
+- PDF
+- PNG 长图
+- HTML
+- Markdown
+- 日志
+
+---
+
+# 安装开发依赖
 
 ```powershell
 python -m pip install -r requirements.txt
 ```
 
-本版本没有新增第三方 Python 包。
+V0.9 正常开发运行没有新增第三方运行依赖。
 
-仍然只有：
+---
 
-```text
-PySide6
-openai
-keyring
+# 本地运行
+
+```powershell
+python main.py
 ```
 
 ---
 
-# API
+# Windows Build
 
-V0.8 不需要申请新的 API。
-
-继续支持：
+详见：
 
 ```text
-DeepSeek
-Qwen
-GLM
-Kimi
-Doubao
-MiniMax
+DEPLOYMENT.md
 ```
 
-API Key 仍然通过 Windows Credential Manager / keyring 保存。
+最简：
+
+```powershell
+.\scripts\build_windows.ps1
+```
 
 ---
 
-# 推荐验收步骤
+# 推荐 V0.9 验收
 
-## A. 进度系统
+## 软件本体
 
-1. 启用 DeepSeek + Doubao + MiniMax。
-2. 只分析黄金 + 生物医药。
-3. 点击开始分析。
-4. 确认总进度变化。
-5. 确认每个模型分别出现：
-   - 进行中
-   - 完成 / 失败
-   - 耗时
-   - Token（API 返回时）
-6. 确认最后到 100%。
+1. 首次启动向导正常。
+2. DeepSeek 等原 API Key 在 Windows 仍可读取。
+3. 今日分析正常。
+4. Multi-AI 进度正常。
+5. 历史 / 新闻 / 统计 / 报告正常。
 
-## B. Token / 成本
+## 响应式
 
-1. 不填写价格跑一次。
-2. 确认 Token 可记录时正常显示。
-3. 确认成本显示“—”。
-4. 在某 Provider 填测试单价。
-5. 再分析一次。
-6. 确认出现估算成本。
+1. 把窗口宽度缩到 900 以下。
+2. 左 Sidebar 应隐藏。
+3. 顶部出现移动导航。
+4. 再拉宽后恢复 Sidebar。
+5. 系统与数据可强制 Desktop / Mobile。
 
-## C. 数据统计
+## 数据
 
-1. 进入“数据统计”。
-2. 切换黄金 / 生物医药。
-3. 确认趋势图可以显示历史评分。
-4. 检查 Provider 成功率和平均耗时。
+1. 系统与数据 → 备份。
+2. 确认产生 `.db`。
+3. 恢复该备份。
+4. 历史数据仍存在。
+5. Schema Version 显示 1。
 
-## D. 晨报归档
+## Windows Build
 
-1. 打开“晨报 / 报告中心”。
-2. 生成 30 秒晨报。
-3. 确认自动出现在“已归档”。
-4. 关闭软件。
-5. 重启软件。
-6. 再打开归档报告。
+1. 安装 Visual Studio Build Tools + Inno Setup。
+2. 运行 `scripts\build_windows.ps1`。
+3. 测试 `dist\StockEventRadar.exe`。
+4. 测试 Setup 安装和卸载。
 
-## E. 日志
+## GitHub
 
-查看：
-
-```text
-%APPDATA%\StockEventRadar\logs\app.log
-```
-
-确认启动和分析记录存在。
+1. Push dev-v0.9。
+2. 手动跑 Windows Release Build。
+3. 下载 GitHub Artifact，在第二台 Windows 测试。
 
 ---
 
-# 后续版本
+# V1.0 剩余目标
 
-## V0.9
+V1.0 不再大改架构。
 
-发布工程版本：
+主要做：
 
-- Windows EXE / Installer
-- 首次启动向导
-- 数据备份恢复
-- 数据库迁移版本号
-- 响应式桌面/移动布局
-- Android Beta 构建路线
-- GitHub Release 构建脚本
+- 新手模式 / 高级模式
+- Windows Release 最终验证
+- Android Beta 真实设备测试
+- Android UI 最终适配
+- 错误信息最终整理
+- 隐私说明
+- API Key 说明
+- License / Third-party notices
+- 数据迁移最终验证
+- 多台 Windows / 多台 Android 测试
+- 性能优化
+- 版本发布页面
 
-## V1.0
 
-上线版本：
+---
 
-- Windows 正式版
-- Android Release Candidate / 正式版
-- 新手模式
-- 高级模式
-- 稳定性和性能打磨
-- 发布说明
-- 隐私 / API Key 说明
-- 多设备真实测试
+# V0.9.3 Hotfix
+
+本修订专门修复两项 V0.9 Windows 测试问题：
+
+1. 窄屏 / 移动导航的 QComboBox 弹出菜单在部分 Windows 配色下出现
+   “深色背景 + 深色文字”，现在统一使用白色菜单背景和深色文字，
+   选中项使用蓝底白字。
+
+2. 新增：
+
+```text
+scripts\build_windows.cmd
+```
+
+如果 `.ps1` 因 PowerShell Execution Policy 被拦截，可以直接：
+
+```powershell
+.\scripts\build_windows.cmd
+```
+
+CMD 包装器只为启动的子 PowerShell 进程传入：
+
+```text
+-ExecutionPolicy Bypass
+```
+
+不会永久修改系统执行策略。
+
+如果希望继续直接运行 `.ps1`，也可以先对可信脚本执行：
+
+```powershell
+Unblock-File .\scripts\build_windows.ps1
+```
+
+
+---
+
+# V0.9.3 Windows Build Hotfix
+
+如果旧版构建日志出现：
+
+```text
+Succeeded with add resources to file ... deployment\main.exe
+...
+FileNotFoundError:
+...\dist\StockEventRadar.exe
+```
+
+说明 Nuitka 编译已经成功，失败发生在最终复制阶段。
+
+V0.9.3 会在编译前创建：
+
+```text
+dist\
+deployment\
+```
+
+并增加自动恢复：
+
+```text
+deployment\main.exe
+→
+dist\StockEventRadar.exe
+```
+
+推荐：
+
+```powershell
+.\scripts\build_windows.cmd
+```
+
+
+---
+
+# V0.9.3：Windows 构建缓存转移到 D 盘
+
+默认大型构建工作区：
+
+```text
+D:\StockEventRadarBuild
+├── temp
+├── nuitka-cache
+└── pip-cache
+```
+
+项目自身的构建输出继续在 D 盘项目目录：
+
+```text
+D:\coding\stock-event-radar
+├── deployment
+└── dist
+```
+
+正常构建：
+
+```powershell
+.\scripts\build_windows.cmd
+```
+
+清理以前 C 盘上的 Nuitka / pip 构建缓存：
+
+```powershell
+.\scripts\cleanup_c_build_cache.cmd
+```
+
+这个清理脚本不会删除：
+
+```text
+%APPDATA%\StockEventRadar\stockradar.db
+```
+
+也不会粗暴删除整个 Windows `%TEMP%`。

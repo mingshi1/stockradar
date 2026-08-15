@@ -11,6 +11,8 @@ from app.report.models import ReportArtifact
 
 
 class Database:
+    SCHEMA_VERSION = 1
+
     def __init__(self, db_path: Path = DATABASE_FILE):
         self.db_path = Path(db_path)
         APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -139,7 +141,172 @@ class Database:
 
                 CREATE INDEX IF NOT EXISTS idx_reports_run
                 ON saved_reports(analysis_run_id);
+
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    version INTEGER PRIMARY KEY,
+                    applied_at TEXT NOT NULL
+                );
             """)
+
+            self._apply_schema_version(conn)
+
+
+    def _apply_schema_version(
+        self,
+        conn,
+    ):
+        current = int(
+            conn.execute(
+                "PRAGMA user_version"
+            ).fetchone()[0]
+        )
+
+        if current < 1:
+            now = datetime.now().isoformat(
+                timespec="seconds"
+            )
+
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO schema_migrations(
+                    version,
+                    applied_at
+                )
+                VALUES (?, ?)
+                """,
+                (
+                    1,
+                    now,
+                ),
+            )
+
+            conn.execute(
+                f"PRAGMA user_version = {self.SCHEMA_VERSION}"
+            )
+
+    def schema_version(self) -> int:
+        with self.connect() as conn:
+            return int(
+                conn.execute(
+                    "PRAGMA user_version"
+                ).fetchone()[0]
+            )
+
+    def backup_database(
+        self,
+        destination: Path,
+    ):
+        destination = Path(destination)
+        destination.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        source = sqlite3.connect(
+            self.db_path
+        )
+        target = sqlite3.connect(
+            destination
+        )
+
+        try:
+            source.backup(target)
+            target.commit()
+        finally:
+            target.close()
+            source.close()
+
+    def validate_database_file(
+        self,
+        source_path: Path,
+    ) -> tuple[bool, str]:
+        source_path = Path(
+            source_path
+        )
+
+        if not source_path.exists():
+            return (
+                False,
+                "备份文件不存在。",
+            )
+
+        try:
+            conn = sqlite3.connect(
+                source_path
+            )
+            conn.row_factory = sqlite3.Row
+
+            tables = {
+                row["name"]
+                for row in conn.execute(
+                    """
+                    SELECT name
+                    FROM sqlite_master
+                    WHERE type = 'table'
+                    """
+                ).fetchall()
+            }
+
+            required = {
+                "analysis_runs",
+                "events",
+                "custom_sectors",
+            }
+
+            if not required.issubset(
+                tables
+            ):
+                return (
+                    False,
+                    "这不是有效的 StockEventRadar 数据库备份。",
+                )
+
+            conn.close()
+        except Exception as exc:
+            return (
+                False,
+                f"无法读取备份数据库：{exc}",
+            )
+
+        return (
+            True,
+            "数据库备份有效。",
+        )
+
+    def restore_database(
+        self,
+        source_path: Path,
+    ):
+        source_path = Path(
+            source_path
+        )
+
+        valid, message = (
+            self.validate_database_file(
+                source_path
+            )
+        )
+
+        if not valid:
+            raise RuntimeError(
+                message
+            )
+
+        source = sqlite3.connect(
+            source_path
+        )
+        target = sqlite3.connect(
+            self.db_path
+        )
+
+        try:
+            source.backup(target)
+            target.commit()
+        finally:
+            target.close()
+            source.close()
+
+        self.initialize()
 
     # =========================================================
     # Custom sectors

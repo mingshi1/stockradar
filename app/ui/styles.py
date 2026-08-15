@@ -216,4 +216,57 @@ QTabBar::tab {
     padding: 8px 14px;
 }
 
+
+#mobileNav {
+    background-color: #171a21;
+    border-bottom: 1px solid #2d3440;
+}
+
+#mobileNavTitle {
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+#mobileNav QComboBox {
+    background-color: #282d37;
+    color: white;
+    border: 1px solid #3b4350;
+    min-width: 160px;
+}
+
+
+/* V0.9.1: Force readable combo-box popup colors.
+   On some Windows palettes Qt inherited a dark popup background
+   while keeping dark item text, which made the mobile navigation unreadable. */
+QComboBox QAbstractItemView {
+    background-color: #ffffff;
+    color: #1f2937;
+    border: 1px solid #cfd4dc;
+    selection-background-color: #2563eb;
+    selection-color: #ffffff;
+    outline: 0;
+    padding: 4px;
+}
+
+QComboBox QAbstractItemView::item {
+    min-height: 30px;
+    padding: 5px 8px;
+}
+
+#mobileNav QComboBox QAbstractItemView {
+    background-color: #ffffff;
+    color: #111827;
+    selection-background-color: #2563eb;
+    selection-color: #ffffff;
+}
+
+#mobileNav QComboBox {
+    background-color: #282d37;
+    color: #ffffff;
+    border: 1px solid #4b5563;
+    border-radius: 6px;
+    padding: 7px 10px;
+}
+
 """

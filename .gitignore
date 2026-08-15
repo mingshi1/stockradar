@@ -36,3 +36,8 @@ dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Deployment generated config
+pysidedeploy.spec
+android-wheels/
+android-output/

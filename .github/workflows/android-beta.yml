@@ -1,0 +1,73 @@
+name: Android Beta Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      pyside_wheel_url:
+        description: "Direct URL to the official PySide6 Android aarch64 wheel"
+        required: true
+        type: string
+      shiboken_wheel_url:
+        description: "Direct URL to the matching official shiboken6 Android aarch64 wheel"
+        required: true
+        type: string
+      pyside_branch:
+        description: "Matching Qt for Python branch, e.g. 6.10"
+        required: true
+        default: "6.10"
+        type: string
+
+jobs:
+  android-beta:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-android.txt
+
+      - name: Download Android wheels
+        run: |
+          mkdir -p android-wheels
+          curl -L "${{ inputs.pyside_wheel_url }}" -o android-wheels/PySide6-android.whl
+          curl -L "${{ inputs.shiboken_wheel_url }}" -o android-wheels/shiboken6-android.whl
+
+      - name: Download matching Android SDK and NDK
+        run: |
+          git clone --depth 1 --branch "${{ inputs.pyside_branch }}" \
+            https://code.qt.io/pyside/pyside-setup
+          python pyside-setup/tools/cross_compile_android/main.py \
+            --download-only \
+            --skip-update \
+            --auto-accept-license
+
+      - name: Build APK Beta
+        run: |
+          chmod +x scripts/build_android.sh
+          ./scripts/build_android.sh \
+            "$PWD/android-wheels/PySide6-android.whl" \
+            "$PWD/android-wheels/shiboken6-android.whl"
+
+      - name: Collect APK/AAB
+        shell: bash
+        run: |
+          mkdir -p android-output
+          find . -maxdepth 4 \( -name "*.apk" -o -name "*.aab" \) \
+            -not -path "./android-output/*" \
+            -exec cp {} android-output/ \;
+          ls -la android-output
+
+      - name: Upload Android Beta
+        uses: actions/upload-artifact@v4
+        with:
+          name: StockEventRadar-Android-Beta-0.9.3
+          path: android-output/*

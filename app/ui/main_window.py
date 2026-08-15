@@ -1,9 +1,11 @@
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QUrl, Qt
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
+    QComboBox,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -19,7 +21,7 @@ from PySide6.QtWidgets import (
 from app.ai.manager import ProviderManager
 from app.analysis.models import AnalysisBundle
 from app.analysis.service import AnalysisService
-from app.config.settings import AppConfig
+from app.config.settings import APP_DATA_DIR, DATABASE_FILE, AppConfig
 from app.database.database import Database
 from app.news.service import NewsService
 from app.report.exporters import export_report
@@ -33,7 +35,10 @@ from app.ui.pages.report_page import ReportPage
 from app.ui.pages.sector_page import SectorPage
 from app.ui.pages.settings_page import SettingsPage
 from app.ui.pages.stats_page import StatsPage
+from app.ui.pages.system_page import SystemPage
+from app.ui.onboarding import FirstRunWizard
 from app.ui.styles import APP_STYLE
+from app.logging_setup import LOG_DIR
 from app.ui.workers import (
     AnalysisWorker,
     ConnectionWorker,
@@ -41,16 +46,23 @@ from app.ui.workers import (
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(
+        self,
+        config: AppConfig | None = None,
+        provider_manager: ProviderManager | None = None,
+    ):
         super().__init__()
 
         self.logger = logging.getLogger(
             "StockEventRadar"
         )
 
-        self.config = AppConfig()
+        self.config = config or AppConfig()
         self.database = Database()
-        self.provider_manager = ProviderManager()
+        self.provider_manager = (
+            provider_manager
+            or ProviderManager()
+        )
         self.analysis_service = AnalysisService(
             self.provider_manager
         )
@@ -72,8 +84,8 @@ class MainWindow(QMainWindow):
             880,
         )
         self.setMinimumSize(
-            1120,
-            720,
+            360,
+            600,
         )
 
         self._build_ui()
@@ -83,6 +95,7 @@ class MainWindow(QMainWindow):
         )
 
         self.refresh_database_views()
+        self._apply_responsive_layout()
 
     # =========================================================
     # UI
@@ -94,7 +107,7 @@ class MainWindow(QMainWindow):
             root_widget
         )
 
-        root_layout = QHBoxLayout(
+        root_layout = QVBoxLayout(
             root_widget
         )
         root_layout.setContentsMargins(
@@ -105,7 +118,37 @@ class MainWindow(QMainWindow):
         )
         root_layout.setSpacing(0)
 
-        sidebar = (
+        self.nav_items = [
+            ("今日分析", 0),
+            ("历史报告", 1),
+            ("板块管理", 2),
+            ("新闻源", 3),
+            ("数据统计", 4),
+            ("晨报 / 报告中心", 5),
+            ("AI 设置", 6),
+            ("系统与数据", 7),
+        ]
+
+        self.mobile_nav = (
+            self._create_mobile_nav()
+        )
+        root_layout.addWidget(
+            self.mobile_nav
+        )
+
+        content = QWidget()
+        content_layout = QHBoxLayout(
+            content
+        )
+        content_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+        content_layout.setSpacing(0)
+
+        self.sidebar = (
             self._create_sidebar()
         )
 
@@ -121,6 +164,7 @@ class MainWindow(QMainWindow):
             config=self.config,
             provider_manager=self.provider_manager,
         )
+        self.system_page = SystemPage()
 
         for page in [
             self.dashboard_page,
@@ -130,20 +174,91 @@ class MainWindow(QMainWindow):
             self.stats_page,
             self.report_page,
             self.settings_page,
+            self.system_page,
         ]:
             self.pages.addWidget(
                 page
             )
 
-        root_layout.addWidget(
-            sidebar
+        content_layout.addWidget(
+            self.sidebar
         )
-        root_layout.addWidget(
+        content_layout.addWidget(
             self.pages,
             1,
         )
 
+        root_layout.addWidget(
+            content,
+            1,
+        )
+
         self.switch_page(0)
+
+    def _create_mobile_nav(
+        self,
+    ) -> QFrame:
+        bar = QFrame()
+        bar.setObjectName(
+            "mobileNav"
+        )
+
+        layout = QHBoxLayout(
+            bar
+        )
+        layout.setContentsMargins(
+            12,
+            8,
+            12,
+            8,
+        )
+
+        title = QLabel(
+            "AI板块事件雷达"
+        )
+        title.setObjectName(
+            "mobileNavTitle"
+        )
+
+        self.mobile_nav_combo = (
+            QComboBox()
+        )
+
+        for text, index in (
+            self.nav_items
+        ):
+            self.mobile_nav_combo.addItem(
+                text,
+                index,
+            )
+
+        self.mobile_nav_combo.currentIndexChanged.connect(
+            self._mobile_nav_changed
+        )
+
+        layout.addWidget(
+            title
+        )
+        layout.addStretch()
+        layout.addWidget(
+            self.mobile_nav_combo,
+            1,
+        )
+
+        return bar
+
+    def _mobile_nav_changed(
+        self,
+    ):
+        index = (
+            self.mobile_nav_combo
+            .currentData()
+        )
+
+        if index is not None:
+            self.switch_page(
+                int(index)
+            )
 
     def _create_sidebar(
         self,
@@ -189,17 +304,7 @@ class MainWindow(QMainWindow):
             QPushButton
         ] = []
 
-        nav_items = [
-            ("今日分析", 0),
-            ("历史报告", 1),
-            ("板块管理", 2),
-            ("新闻源", 3),
-            ("数据统计", 4),
-            ("晨报 / 报告中心", 5),
-            ("AI 设置", 6),
-        ]
-
-        for text, index in nav_items:
+        for text, index in self.nav_items:
             button = QPushButton(
                 text
             )
@@ -229,7 +334,7 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         version = QLabel(
-            "v0.8.0"
+            "v0.9.3"
         )
         version.setObjectName(
             "versionLabel"
@@ -282,6 +387,25 @@ class MainWindow(QMainWindow):
             self.open_saved_report
         )
 
+        self.system_page.backup_requested.connect(
+            self.backup_database
+        )
+        self.system_page.restore_requested.connect(
+            self.restore_database
+        )
+        self.system_page.open_data_requested.connect(
+            self.open_data_directory
+        )
+        self.system_page.open_logs_requested.connect(
+            self.open_logs_directory
+        )
+        self.system_page.rerun_onboarding_requested.connect(
+            self.rerun_onboarding
+        )
+        self.system_page.ui_mode_changed.connect(
+            self.change_ui_mode
+        )
+
     def switch_page(
         self,
         index: int,
@@ -297,14 +421,68 @@ class MainWindow(QMainWindow):
                 button_index == index
             )
 
+        combo_index = (
+            self.mobile_nav_combo
+            .findData(index)
+        )
+
+        if combo_index >= 0:
+            self.mobile_nav_combo.blockSignals(
+                True
+            )
+            self.mobile_nav_combo.setCurrentIndex(
+                combo_index
+            )
+            self.mobile_nav_combo.blockSignals(
+                False
+            )
+
         if index in (
             1,
             2,
             3,
             4,
             5,
+            7,
         ):
             self.refresh_database_views()
+
+        if index == 7:
+            self.refresh_system_info()
+
+    def resizeEvent(
+        self,
+        event,
+    ):
+        super().resizeEvent(event)
+        self._apply_responsive_layout()
+
+    def _apply_responsive_layout(
+        self,
+    ):
+        mode = self.config.ui_mode
+
+        if mode == "desktop":
+            mobile = False
+        elif mode == "mobile":
+            mobile = True
+        else:
+            mobile = self.width() < 900
+
+        self.sidebar.setVisible(
+            not mobile
+        )
+        self.mobile_nav.setVisible(
+            mobile
+        )
+
+    def change_ui_mode(
+        self,
+        mode: str,
+    ):
+        self.config.ui_mode = mode
+        self.config.save()
+        self._apply_responsive_layout()
 
     # =========================================================
     # SQLite-backed views
@@ -890,6 +1068,195 @@ class MainWindow(QMainWindow):
             "报告已经保存到：\n\n"
             f"{Path(file_path)}",
         )
+
+    # =========================================================
+    # System / backup / onboarding
+    # =========================================================
+
+    def refresh_system_info(
+        self,
+    ):
+        self.system_page.set_system_info(
+            schema_version=(
+                self.database
+                .schema_version()
+            ),
+            database_path=str(
+                DATABASE_FILE
+            ),
+            ui_mode=(
+                self.config.ui_mode
+            ),
+            secret_persistent=(
+                self.config
+                .secret_store_is_persistent()
+            ),
+        )
+
+    def backup_database(
+        self,
+    ):
+        from datetime import datetime
+
+        default_name = (
+            "StockEventRadar-backup-"
+            + datetime.now().strftime(
+                "%Y%m%d-%H%M%S"
+            )
+            + ".db"
+        )
+
+        file_path, _ = (
+            QFileDialog
+            .getSaveFileName(
+                self,
+                "备份数据库",
+                default_name,
+                "SQLite 数据库 (*.db)",
+            )
+        )
+
+        if not file_path:
+            return
+
+        if not file_path.lower().endswith(
+            ".db"
+        ):
+            file_path += ".db"
+
+        try:
+            self.database.backup_database(
+                Path(file_path)
+            )
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "备份失败",
+                str(exc),
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "备份完成",
+            "数据库已经备份到：\n\n"
+            f"{file_path}",
+        )
+
+    def restore_database(
+        self,
+    ):
+        file_path, _ = (
+            QFileDialog
+            .getOpenFileName(
+                self,
+                "选择数据库备份",
+                "",
+                "SQLite 数据库 (*.db);;所有文件 (*.*)",
+            )
+        )
+
+        if not file_path:
+            return
+
+        valid, message = (
+            self.database
+            .validate_database_file(
+                Path(file_path)
+            )
+        )
+
+        if not valid:
+            QMessageBox.critical(
+                self,
+                "备份无效",
+                message,
+            )
+            return
+
+        answer = QMessageBox.warning(
+            self,
+            "确认恢复",
+            "恢复会用备份内容替换当前本地数据库。\n\n"
+            "建议先点击“备份数据库”保存当前数据。\n\n"
+            "确定继续吗？",
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if (
+            answer
+            != QMessageBox
+            .StandardButton.Yes
+        ):
+            return
+
+        try:
+            self.database.restore_database(
+                Path(file_path)
+            )
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "恢复失败",
+                str(exc),
+            )
+            return
+
+        self.refresh_database_views()
+        self.refresh_system_info()
+
+        QMessageBox.information(
+            self,
+            "恢复完成",
+            "数据库已恢复，当前界面数据已经刷新。",
+        )
+
+    def open_data_directory(
+        self,
+    ):
+        APP_DATA_DIR.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        QDesktopServices.openUrl(
+            QUrl.fromLocalFile(
+                str(APP_DATA_DIR)
+            )
+        )
+
+    def open_logs_directory(
+        self,
+    ):
+        LOG_DIR.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        QDesktopServices.openUrl(
+            QUrl.fromLocalFile(
+                str(LOG_DIR)
+            )
+        )
+
+    def rerun_onboarding(
+        self,
+    ):
+        wizard = FirstRunWizard(
+            config=self.config,
+            provider_manager=(
+                self.provider_manager
+            ),
+            parent=self,
+        )
+        wizard.exec()
+
+        # Wizard values are saved immediately and the next
+        # analysis uses the updated config. The full AI settings
+        # page will reflect them after the next app restart.
+        self.refresh_system_info()
 
     # =========================================================
     # Settings

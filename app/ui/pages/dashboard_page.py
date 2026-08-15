@@ -52,7 +52,7 @@ class DashboardPage(QWidget):
         title.setObjectName("pageTitle")
 
         description = QLabel(
-            "V0.8 会实时显示联网研究、每个模型、共识计算和 Judge 的实际任务状态。"
+            "V0.9 会实时显示联网研究、每个模型、共识计算和 Judge 的实际任务状态。"
         )
         description.setObjectName("pageDescription")
 
