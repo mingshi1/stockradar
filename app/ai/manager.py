@@ -9,7 +9,7 @@ from app.ai.providers.zhipu import ZhipuProvider
 
 class ProviderManager:
     """
-    V0.8 国产优先 Provider 注册中心。
+    当前版本 国产优先 Provider 注册中心。
 
     已移除 OpenAI。
     """

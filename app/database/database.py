@@ -11,7 +11,7 @@ from app.report.models import ReportArtifact
 
 
 class Database:
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 3
 
     def __init__(self, db_path: Path = DATABASE_FILE):
         self.db_path = Path(db_path)
@@ -142,6 +142,41 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_reports_run
                 ON saved_reports(analysis_run_id);
 
+                CREATE TABLE IF NOT EXISTS scheduled_tasks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    run_time TEXT NOT NULL,
+                    sectors_json TEXT NOT NULL,
+                    analysis_mode TEXT NOT NULL DEFAULT 'current',
+                    report_type TEXT NOT NULL DEFAULT 'morning',
+                    generate_pdf INTEGER NOT NULL DEFAULT 1,
+                    report_directory TEXT NOT NULL DEFAULT '',
+                    email_enabled INTEGER NOT NULL DEFAULT 0,
+                    email_recipients TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    last_run_at TEXT,
+                    last_status TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS task_runs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id INTEGER NOT NULL,
+                    started_at TEXT NOT NULL,
+                    finished_at TEXT,
+                    status TEXT NOT NULL,
+                    analysis_run_id INTEGER,
+                    report_id INTEGER,
+                    email_status TEXT NOT NULL DEFAULT 'not_requested',
+                    error TEXT,
+                    FOREIGN KEY (task_id)
+                        REFERENCES scheduled_tasks(id) ON DELETE CASCADE
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_task_runs_task
+                ON task_runs(task_id, id DESC);
+
                 CREATE TABLE IF NOT EXISTS schema_migrations (
                     version INTEGER PRIMARY KEY,
                     applied_at TEXT NOT NULL
@@ -179,10 +214,67 @@ class Database:
                     now,
                 ),
             )
+            current = 1
+
+        if current < 2:
+            now = datetime.now().isoformat(
+                timespec="seconds"
+            )
 
             conn.execute(
-                f"PRAGMA user_version = {self.SCHEMA_VERSION}"
+                """
+                INSERT OR IGNORE INTO schema_migrations(
+                    version,
+                    applied_at
+                )
+                VALUES (?, ?)
+                """,
+                (
+                    2,
+                    now,
+                ),
             )
+            current = 2
+
+        if current < 3:
+            columns = {
+                row["name"]
+                for row in conn.execute(
+                    "PRAGMA table_info(scheduled_tasks)"
+                ).fetchall()
+            }
+
+            if "report_directory" not in columns:
+                conn.execute(
+                    """
+                    ALTER TABLE scheduled_tasks
+                    ADD COLUMN report_directory
+                    TEXT NOT NULL DEFAULT ''
+                    """
+                )
+
+            now = datetime.now().isoformat(
+                timespec="seconds"
+            )
+
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO schema_migrations(
+                    version,
+                    applied_at
+                )
+                VALUES (?, ?)
+                """,
+                (
+                    3,
+                    now,
+                ),
+            )
+            current = 3
+
+        conn.execute(
+            f"PRAGMA user_version = {self.SCHEMA_VERSION}"
+        )
 
     def schema_version(self) -> int:
         with self.connect() as conn:
@@ -749,6 +841,340 @@ class Database:
             ).fetchall()
 
         return [row["sector"] for row in rows]
+
+
+    # =========================================================
+    # Scheduled automation
+    # =========================================================
+
+    def save_scheduled_task(
+        self,
+        payload: dict,
+    ) -> int:
+        now = datetime.now().isoformat(
+            timespec="seconds"
+        )
+
+        sectors = [
+            str(item).strip()
+            for item in payload.get(
+                "sectors",
+                [],
+            )
+            if str(item).strip()
+        ]
+
+        if not sectors:
+            raise ValueError(
+                "自动任务至少需要一个板块。"
+            )
+
+        task_id = payload.get("id")
+
+        values = (
+            str(
+                payload.get(
+                    "name",
+                    "每日任务",
+                )
+            ).strip()
+            or "每日任务",
+            1 if payload.get("enabled") else 0,
+            str(
+                payload.get(
+                    "run_time",
+                    "07:30",
+                )
+            ),
+            json.dumps(
+                sectors,
+                ensure_ascii=False,
+            ),
+            str(
+                payload.get(
+                    "analysis_mode",
+                    "current",
+                )
+            ),
+            str(
+                payload.get(
+                    "report_type",
+                    "morning",
+                )
+            ),
+            1 if payload.get("generate_pdf") else 0,
+            str(
+                payload.get(
+                    "report_directory",
+                    "",
+                )
+            ).strip(),
+            0,
+            "",
+        )
+
+        with self.connect() as conn:
+            if task_id:
+                conn.execute(
+                    """
+                    UPDATE scheduled_tasks
+                    SET
+                        name = ?,
+                        enabled = ?,
+                        run_time = ?,
+                        sectors_json = ?,
+                        analysis_mode = ?,
+                        report_type = ?,
+                        generate_pdf = ?,
+                        report_directory = ?,
+                        email_enabled = ?,
+                        email_recipients = ?,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        *values,
+                        now,
+                        int(task_id),
+                    ),
+                )
+
+                row = conn.execute(
+                    """
+                    SELECT id
+                    FROM scheduled_tasks
+                    WHERE id = ?
+                    """,
+                    (int(task_id),),
+                ).fetchone()
+
+                if row is None:
+                    raise ValueError(
+                        "要更新的自动任务不存在。"
+                    )
+
+                return int(row["id"])
+
+            cursor = conn.execute(
+                """
+                INSERT INTO scheduled_tasks(
+                    name,
+                    enabled,
+                    run_time,
+                    sectors_json,
+                    analysis_mode,
+                    report_type,
+                    generate_pdf,
+                    report_directory,
+                    email_enabled,
+                    email_recipients,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    *values,
+                    now,
+                    now,
+                ),
+            )
+
+            return int(cursor.lastrowid)
+
+    def delete_scheduled_task(
+        self,
+        task_id: int,
+    ):
+        with self.connect() as conn:
+            conn.execute(
+                """
+                DELETE FROM scheduled_tasks
+                WHERE id = ?
+                """,
+                (int(task_id),),
+            )
+
+    def list_scheduled_tasks(
+        self,
+    ) -> list[dict]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM scheduled_tasks
+                ORDER BY enabled DESC, run_time, id
+                """
+            ).fetchall()
+
+        return [
+            self._decode_task_row(row)
+            for row in rows
+        ]
+
+    def get_scheduled_task(
+        self,
+        task_id: int,
+    ) -> dict | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT *
+                FROM scheduled_tasks
+                WHERE id = ?
+                """,
+                (int(task_id),),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return self._decode_task_row(row)
+
+    @staticmethod
+    def _decode_task_row(
+        row,
+    ) -> dict:
+        item = dict(row)
+
+        try:
+            item["sectors"] = json.loads(
+                item.pop("sectors_json")
+            )
+        except Exception:
+            item.pop("sectors_json", None)
+            item["sectors"] = []
+
+        for key in (
+            "enabled",
+            "generate_pdf",
+            "email_enabled",
+        ):
+            item[key] = bool(
+                item.get(key)
+            )
+
+        return item
+
+    def start_task_run(
+        self,
+        task_id: int,
+    ) -> int:
+        now = datetime.now().isoformat(
+            timespec="seconds"
+        )
+
+        with self.connect() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO task_runs(
+                    task_id,
+                    started_at,
+                    status,
+                    email_status
+                )
+                VALUES (?, ?, 'running', 'not_requested')
+                """,
+                (
+                    int(task_id),
+                    now,
+                ),
+            )
+
+            conn.execute(
+                """
+                UPDATE scheduled_tasks
+                SET
+                    last_run_at = ?,
+                    last_status = 'running'
+                WHERE id = ?
+                """,
+                (
+                    now,
+                    int(task_id),
+                ),
+            )
+
+            return int(cursor.lastrowid)
+
+    def finish_task_run(
+        self,
+        *,
+        task_run_id: int,
+        task_id: int,
+        status: str,
+        analysis_run_id: int | None,
+        report_id: int | None,
+        email_status: str,
+        error: str | None,
+    ):
+        now = datetime.now().isoformat(
+            timespec="seconds"
+        )
+
+        with self.connect() as conn:
+            conn.execute(
+                """
+                UPDATE task_runs
+                SET
+                    finished_at = ?,
+                    status = ?,
+                    analysis_run_id = ?,
+                    report_id = ?,
+                    email_status = ?,
+                    error = ?
+                WHERE id = ?
+                """,
+                (
+                    now,
+                    status,
+                    analysis_run_id,
+                    report_id,
+                    email_status,
+                    error,
+                    int(task_run_id),
+                ),
+            )
+
+            conn.execute(
+                """
+                UPDATE scheduled_tasks
+                SET
+                    last_run_at = ?,
+                    last_status = ?,
+                    updated_at = updated_at
+                WHERE id = ?
+                """,
+                (
+                    now,
+                    status,
+                    int(task_id),
+                ),
+            )
+
+    def list_task_runs(
+        self,
+        limit: int = 100,
+    ) -> list[dict]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    tr.*,
+                    st.name AS task_name
+                FROM task_runs tr
+                JOIN scheduled_tasks st
+                  ON st.id = tr.task_id
+                ORDER BY tr.id DESC
+                LIMIT ?
+                """,
+                (int(limit),),
+            ).fetchall()
+
+        return [
+            dict(row)
+            for row in rows
+        ]
 
     # =========================================================
     # Saved reports

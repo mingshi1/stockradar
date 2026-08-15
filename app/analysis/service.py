@@ -22,7 +22,7 @@ ProgressCallback = Callable[[dict], None]
 
 class AnalysisService:
     """
-    V0.8 可观测 Multi-AI 流程。
+    当前版本 可观测 Multi-AI 流程。
 
     progress_callback 会持续汇报“我们真实知道的阶段”，
     而不是伪造模型内部思考百分比。

@@ -21,6 +21,8 @@ from PySide6.QtWidgets import (
 from app.ai.manager import ProviderManager
 from app.analysis.models import AnalysisBundle
 from app.analysis.service import AnalysisService
+from app.automation.scheduler import WindowsTaskScheduler
+from app.automation.service import AutomationService
 from app.config.settings import APP_DATA_DIR, DATABASE_FILE, AppConfig
 from app.database.database import Database
 from app.news.service import NewsService
@@ -28,6 +30,7 @@ from app.report.exporters import export_report
 from app.report.html_renderer import render_analysis_html
 from app.report.models import ReportArtifact
 from app.report.service import ReportService
+from app.ui.pages.automation_page import AutomationPage
 from app.ui.pages.dashboard_page import DashboardPage
 from app.ui.pages.history_page import HistoryPage
 from app.ui.pages.news_page import NewsPage
@@ -41,7 +44,9 @@ from app.ui.styles import APP_STYLE
 from app.logging_setup import LOG_DIR
 from app.ui.workers import (
     AnalysisWorker,
+    AutomationWorker,
     ConnectionWorker,
+    TimeSyncWorker,
 )
 
 
@@ -70,8 +75,16 @@ class MainWindow(QMainWindow):
             self.database
         )
         self.report_service = ReportService()
+        self.task_scheduler = WindowsTaskScheduler()
+        self.automation_service = AutomationService(
+            config=self.config,
+            database=self.database,
+            provider_manager=self.provider_manager,
+        )
 
         self.analysis_worker: AnalysisWorker | None = None
+        self.automation_worker: AutomationWorker | None = None
+        self.time_sync_worker: TimeSyncWorker | None = None
         self.connection_worker: ConnectionWorker | None = None
         self.connection_provider_name: str | None = None
         self.current_report_artifact: ReportArtifact | None = None
@@ -125,8 +138,9 @@ class MainWindow(QMainWindow):
             ("新闻源", 3),
             ("数据统计", 4),
             ("晨报 / 报告中心", 5),
-            ("AI 设置", 6),
-            ("系统与数据", 7),
+            ("自动任务", 6),
+            ("AI 设置", 7),
+            ("系统与数据", 8),
         ]
 
         self.mobile_nav = (
@@ -160,6 +174,7 @@ class MainWindow(QMainWindow):
         self.news_page = NewsPage()
         self.stats_page = StatsPage()
         self.report_page = ReportPage()
+        self.automation_page = AutomationPage()
         self.settings_page = SettingsPage(
             config=self.config,
             provider_manager=self.provider_manager,
@@ -173,6 +188,7 @@ class MainWindow(QMainWindow):
             self.news_page,
             self.stats_page,
             self.report_page,
+            self.automation_page,
             self.settings_page,
             self.system_page,
         ]:
@@ -334,7 +350,7 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         version = QLabel(
-            "v0.9.3"
+            "v1.0.0 RC1"
         )
         version.setObjectName(
             "versionLabel"
@@ -385,6 +401,22 @@ class MainWindow(QMainWindow):
         )
         self.report_page.saved_report_requested.connect(
             self.open_saved_report
+        )
+
+        self.automation_page.sync_time_requested.connect(
+            self.sync_system_time
+        )
+        self.automation_page.save_task_requested.connect(
+            self.save_scheduled_task
+        )
+        self.automation_page.delete_task_requested.connect(
+            self.delete_scheduled_task
+        )
+        self.automation_page.run_task_requested.connect(
+            self.run_scheduled_task_now
+        )
+        self.automation_page.refresh_requested.connect(
+            self.refresh_automation_views
         )
 
         self.system_page.backup_requested.connect(
@@ -443,11 +475,15 @@ class MainWindow(QMainWindow):
             3,
             4,
             5,
-            7,
+            6,
+            8,
         ):
             self.refresh_database_views()
 
-        if index == 7:
+        if index == 6:
+            self.refresh_automation_views()
+
+        if index == 8:
             self.refresh_system_info()
 
     def resizeEvent(
@@ -642,7 +678,7 @@ class MainWindow(QMainWindow):
                 f"请先在“AI 设置”中配置 "
                 f"{research_provider} API Key。",
             )
-            self.switch_page(6)
+            self.switch_page(7)
             return
 
         if (
@@ -1068,6 +1104,273 @@ class MainWindow(QMainWindow):
             "报告已经保存到：\n\n"
             f"{Path(file_path)}",
         )
+
+
+    # =========================================================
+    # Automation center
+    # =========================================================
+
+    def refresh_automation_views(
+        self,
+    ):
+        self.automation_page.set_tasks(
+            self.database
+            .list_scheduled_tasks()
+        )
+        self.automation_page.set_task_runs(
+            self.database
+            .list_task_runs(
+                limit=100
+            )
+        )
+
+
+    def sync_system_time(
+        self,
+    ):
+        if (
+            self.time_sync_worker is not None
+            and self.time_sync_worker.isRunning()
+        ):
+            return
+
+        self.automation_page.set_sync_running(
+            True
+        )
+
+        self.time_sync_worker = (
+            TimeSyncWorker()
+        )
+        self.time_sync_worker.result_ready.connect(
+            self.on_time_sync_result
+        )
+        self.time_sync_worker.finished.connect(
+            self.on_time_sync_finished
+        )
+        self.time_sync_worker.start()
+
+    def on_time_sync_result(
+        self,
+        success: bool,
+        message: str,
+    ):
+        if success:
+            QMessageBox.information(
+                self,
+                "时间同步完成",
+                message
+                or "Windows 时间同步请求已完成。",
+            )
+        else:
+            QMessageBox.warning(
+                self,
+                "时间同步未完成",
+                message,
+            )
+
+    def on_time_sync_finished(
+        self,
+    ):
+        self.automation_page.set_sync_running(
+            False
+        )
+        self.time_sync_worker = None
+
+    def save_scheduled_task(
+        self,
+        payload: dict,
+    ):
+        sectors = payload.get(
+            "sectors",
+            [],
+        )
+
+        if not sectors:
+            QMessageBox.warning(
+                self,
+                "无法保存",
+                "自动任务至少需要一个分析板块。",
+            )
+            return
+
+        try:
+            task_id = (
+                self.database
+                .save_scheduled_task(
+                    payload
+                )
+            )
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "保存任务失败",
+                str(exc),
+            )
+            return
+
+        if payload.get("enabled"):
+            success, message = (
+                self.task_scheduler
+                .register_daily(
+                    task_id=task_id,
+                    run_time=str(
+                        payload.get(
+                            "run_time",
+                            "07:30",
+                        )
+                    ),
+                )
+            )
+        else:
+            success, message = (
+                self.task_scheduler
+                .unregister(task_id)
+            )
+
+        self.refresh_automation_views()
+
+        if success:
+            QMessageBox.information(
+                self,
+                "任务已保存",
+                (
+                    f"自动任务 #{task_id} 已保存。\n\n"
+                    + (
+                        "Windows 每日计划任务已经注册。"
+                        if payload.get("enabled")
+                        else "任务已停用，Windows 计划任务已移除。"
+                    )
+                ),
+            )
+        else:
+            QMessageBox.warning(
+                self,
+                "任务已保存，但系统调度未完成",
+                (
+                    f"数据库中的任务 #{task_id} 已保存，"
+                    "但 Windows Task Scheduler 注册失败：\n\n"
+                    f"{message}\n\n"
+                    "你仍可以使用“立即执行”测试任务。"
+                ),
+            )
+
+    def delete_scheduled_task(
+        self,
+        task_id: int,
+    ):
+        answer = QMessageBox.question(
+            self,
+            "删除自动任务",
+            f"确定删除自动任务 #{task_id} 吗？",
+        )
+
+        if (
+            answer
+            != QMessageBox.StandardButton.Yes
+        ):
+            return
+
+        self.task_scheduler.unregister(
+            task_id
+        )
+        self.database.delete_scheduled_task(
+            task_id
+        )
+        self.refresh_automation_views()
+
+    def run_scheduled_task_now(
+        self,
+        task_id: int,
+    ):
+        if (
+            self.automation_worker is not None
+            and self.automation_worker.isRunning()
+        ):
+            QMessageBox.information(
+                self,
+                "已有任务运行",
+                "请等待当前自动任务完成。",
+            )
+            return
+
+        self.automation_page.set_task_running(
+            True,
+            f"正在执行自动任务 #{task_id}…",
+        )
+
+        self.automation_worker = (
+            AutomationWorker(
+                self.automation_service,
+                task_id,
+            )
+        )
+        self.automation_worker.progress_changed.connect(
+            self.automation_page
+            .apply_task_progress
+        )
+        self.automation_worker.result_ready.connect(
+            self.on_automation_result
+        )
+        self.automation_worker.error_occurred.connect(
+            self.on_automation_error
+        )
+        self.automation_worker.finished.connect(
+            self.on_automation_finished
+        )
+        self.automation_worker.start()
+
+    def on_automation_result(
+        self,
+        result: dict,
+    ):
+        self.refresh_database_views()
+        self.refresh_automation_views()
+
+        status = result.get(
+            "status"
+        )
+
+        if status == "success":
+            QMessageBox.information(
+                self,
+                "自动任务完成",
+                (
+                    "分析、报告和已启用的后续动作均已完成。\n\n"
+                    f"分析 ID：{result.get('analysis_run_id')}\n"
+                    f"报告 ID：{result.get('report_id')}"
+                ),
+            )
+        else:
+            QMessageBox.warning(
+                self,
+                "自动任务部分完成",
+                str(
+                    result.get(
+                        "message",
+                        "",
+                    )
+                ),
+            )
+
+    def on_automation_error(
+        self,
+        message: str,
+    ):
+        self.refresh_automation_views()
+        QMessageBox.critical(
+            self,
+            "自动任务失败",
+            message,
+        )
+
+    def on_automation_finished(
+        self,
+    ):
+        self.automation_page.set_task_running(
+            False,
+            "任务已结束，可查看下方运行记录。",
+        )
+        self.automation_worker = None
 
     # =========================================================
     # System / backup / onboarding

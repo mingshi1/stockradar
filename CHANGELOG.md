@@ -1,5 +1,67 @@
 # Changelog
 
+## 1.0.0-rc3
+
+### Changed
+- 从 V1.0 范围移除 SMTP / 邮件发送功能。
+- 自动任务聚焦于每日定时分析、自动报告和本地文件保存。
+- 保留自定义报告保存目录。
+- 新任务强制关闭历史 email 字段，兼容 RC1/RC2 数据库而不做破坏性迁移。
+
+### Build
+- 保留 D 盘构建缓存。
+- 保留 `D:\Inno Setup 6\ISCC.exe` 自动发现。
+
+### Test
+- 新增 `V1_RC3_TEST_PLAN.md`。
+
+## 1.0.0-rc2
+
+### Fixed
+- 清理 AI 设置等界面残留的 V0.8 文案。
+
+### Added
+- 每个自动任务都可以指定“报告保存目录”。
+- 留空时继续使用默认 `%APPDATA%\StockEventRadar\auto_reports\YYYY-MM`。
+- 指定目录时 PDF 直接保存到用户选择的文件夹。
+- SMTP 页面增加 Outlook.com 参数按钮：
+  - `smtp-mail.outlook.com`
+  - `587`
+  - `STARTTLS`
+- Outlook.com 新式身份验证提示，避免把 OAuth2 认证失败误判为密码填写错误。
+
+### Database
+- SQLite schema v3。
+- `scheduled_tasks` 新增 `report_directory` 字段。
+
+### Status
+- Outlook.com 官方目前要求 OAuth2/Modern Auth。
+- RC2 仍保留标准 SMTP 用户名/密码模式用于支持该方式的邮箱；
+  Outlook OAuth 登录将在实际认证测试需要时单独补齐。
+
+## 1.0.0-rc1
+
+### Added
+- 自动任务中心。
+- Windows 系统时间同步。
+- Windows Task Scheduler 每日固定时间任务。
+- `--run-task <ID>` 无主窗口自动任务执行入口。
+- 自动报告归档与可选 PDF。
+- SMTP 邮件配置、测试邮件、报告邮件、PDF 附件。
+- 自动任务运行历史。
+- SQLite schema v2：`scheduled_tasks`、`task_runs`。
+
+### Security
+- SMTP 密码/授权码继续通过 SecretStore / Windows Credential Manager 保存。
+- 不把 SMTP 密码写入 settings.json。
+
+### Build
+- 继续把 TEMP / Nuitka / pip 缓存放到 D 盘。
+- 自动识别 `D:\Inno Setup 6\ISCC.exe`。
+
+### Status
+- RC1 候选测试版；Windows EXE / Setup / 定时触发 / SMTP 需要用户机器实测后再发布正式 v1.0.0。
+
 ## 0.9.3
 
 ### Changed

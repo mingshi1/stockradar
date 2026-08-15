@@ -158,7 +158,7 @@ class SettingsPage(QWidget):
         )
 
         hint = QLabel(
-            "日常建议启用 2~3 个模型。V0.8 会记录每次 Provider 耗时和 Token；"
+            "日常建议启用 2~3 个模型。当前版本 会记录每次 Provider 耗时和 Token；"
             "价格字段留空/0 时仍记录 Token，但不估算成本。"
         )
         hint.setWordWrap(True)

@@ -43,7 +43,7 @@ class ReportPage(QWidget):
         )
 
         description = QLabel(
-            "V0.8 生成预览时会自动归档到 SQLite；同一分析记录 + 同一报告类型会更新，不会无限重复。"
+            "当前版本 生成预览时会自动归档到 SQLite；同一分析记录 + 同一报告类型会更新，不会无限重复。"
         )
         description.setWordWrap(True)
         description.setObjectName(

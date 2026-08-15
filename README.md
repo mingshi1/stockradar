@@ -1,4 +1,4 @@
-# AI板块事件雷达 v0.9.3
+# AI板块事件雷达 v1.0.0-rc3
 
 V0.9 的主题是：
 
@@ -175,8 +175,8 @@ Windows 可以：
 或者：
 
 ```text
-git tag v0.9.3
-git push origin v0.9.3
+git tag v1.0.0-rc3
+git push origin v1.0.0-rc3
 ```
 
 触发 Release 构建。
@@ -339,7 +339,7 @@ V1.0 不再大改架构。
 
 ---
 
-# V0.9.3 Hotfix
+# V1.0.0 RC3 Hotfix
 
 本修订专门修复两项 V0.9 Windows 测试问题：
 
@@ -376,7 +376,7 @@ Unblock-File .\scripts\build_windows.ps1
 
 ---
 
-# V0.9.3 Windows Build Hotfix
+# V1.0.0 RC3 Windows Build Hotfix
 
 如果旧版构建日志出现：
 
@@ -389,7 +389,7 @@ FileNotFoundError:
 
 说明 Nuitka 编译已经成功，失败发生在最终复制阶段。
 
-V0.9.3 会在编译前创建：
+V1.0.0 RC3 会在编译前创建：
 
 ```text
 dist\
@@ -413,7 +413,7 @@ dist\StockEventRadar.exe
 
 ---
 
-# V0.9.3：Windows 构建缓存转移到 D 盘
+# V1.0.0 RC3：Windows 构建缓存转移到 D 盘
 
 默认大型构建工作区：
 
@@ -451,3 +451,46 @@ D:\coding\stock-event-radar
 ```
 
 也不会粗暴删除整个 Windows `%TEMP%`。
+
+
+---
+
+# V1.0.0 RC3：自动任务中心
+
+本候选版新增：
+
+- Windows 每日固定时间自动分析
+- Windows 时间同步
+- 自动报告 / PDF
+- SMTP 测试邮件
+- 自动报告邮件
+- 自动任务运行历史
+- SQLite schema v2
+- `--run-task <ID>` 无主窗口任务模式
+
+详细测试步骤见：
+
+```text
+V1_RC1_TEST_PLAN.md
+```
+
+建议测试通过后再创建 GitHub Release / Android Beta。
+
+
+---
+
+# V1.0.0 RC3
+
+RC3 将邮件/SMTP功能从正式范围中移除，聚焦：
+- 自动定时分析
+- 时间同步
+- 自动报告
+- 自定义报告目录
+- Windows 发布
+- Android Beta 真机测试
+
+测试步骤见 `V1_RC3_TEST_PLAN.md`。
+
+## RC3 功能范围说明
+
+邮件 / SMTP 功能已从当前版本移除。自动任务只负责定时分析、报告归档和本地 PDF 保存。

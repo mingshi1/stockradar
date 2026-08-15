@@ -69,5 +69,5 @@ jobs:
       - name: Upload Android Beta
         uses: actions/upload-artifact@v4
         with:
-          name: StockEventRadar-Android-Beta-0.9.3
+          name: StockEventRadar-Android-Beta-1.0.0-rc3
           path: android-output/*

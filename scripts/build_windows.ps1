@@ -9,7 +9,7 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectRoot
 
 Write-Host "=========================================="
-Write-Host " StockEventRadar v0.9.3 Windows Build"
+Write-Host " StockEventRadar v1.0.0-rc3 Windows Build"
 Write-Host "=========================================="
 Write-Host ""
 
@@ -94,8 +94,10 @@ if ($SkipInstaller) {
 Write-Host "[4/4] Looking for Inno Setup..."
 
 $IsccCandidates = @(
-    "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
-    "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+    "D:\Inno Setup 6\ISCC.exe",
+    "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+    "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+    "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
 )
 
 $Iscc = $null

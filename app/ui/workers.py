@@ -74,3 +74,45 @@ class ConnectionWorker(QThread):
             self.error_occurred.emit(
                 str(exc)
             )
+
+
+class AutomationWorker(QThread):
+    result_ready = Signal(object)
+    error_occurred = Signal(str)
+    progress_changed = Signal(object)
+
+    def __init__(
+        self,
+        automation_service,
+        task_id: int,
+    ):
+        super().__init__()
+        self.automation_service = automation_service
+        self.task_id = int(task_id)
+
+    def run(self):
+        try:
+            result = self.automation_service.run_task(
+                self.task_id,
+                progress_callback=(
+                    self.progress_changed.emit
+                ),
+            )
+            self.result_ready.emit(result)
+        except Exception as exc:
+            self.error_occurred.emit(str(exc))
+
+
+class TimeSyncWorker(QThread):
+    result_ready = Signal(bool, str)
+
+    def run(self):
+        from app.automation.time_service import TimeService
+
+        success, message = (
+            TimeService.sync_system_time()
+        )
+        self.result_ready.emit(
+            success,
+            message,
+        )
