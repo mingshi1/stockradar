@@ -10,7 +10,7 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectRoot
 
 Write-Host "=========================================="
-Write-Host " StockEventRadar v1.0.0-rc4.15.1 Windows Build"
+Write-Host " StockEventRadar v1.0.0-rc4.16.1 Windows Build"
 Write-Host "=========================================="
 Write-Host ""
 

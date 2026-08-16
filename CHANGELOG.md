@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.0-rc4.16
+
+### Android MainWindow native crash fix
+- 荣耀真机 ADB 已确认 Android 平台识别正确。
+- RC4.15 真正崩溃为 qtMainLoopThread 上的 SIGSEGV。
+- native stack 位于 libshiboken6 Python override error handling，
+  并经过 QWidget::event / processGeometryChangeEvent / QWidget::show。
+- 修复 MainWindow 在 UI 构建完成前可能触发 resizeEvent 的初始化竞态。
+- Android 不再在 `_build_ui()` 前执行桌面尺寸 `resize(1360, 880)`。
+- 增加 `_ui_ready` guard；UI 未完整创建时 resizeEvent 不执行响应式布局。
+- resizeEvent 内部异常全部捕获并记录，不允许异常穿过 Qt virtual override。
+- 增加 MainWindow constructing / constructed / shown 阶段日志。
+- 继续只上传一个 Android APK。
+
 ## 1.0.0-rc4.15
 
 ### Android runtime detection root fix

@@ -60,6 +60,10 @@ class MainWindow(QMainWindow):
     ):
         super().__init__()
 
+        # Android can dispatch geometry/resize events while the Python
+        # constructor is still building child widgets.
+        self._ui_ready = False
+
         self.logger = logging.getLogger(
             "StockEventRadar"
         )
@@ -94,14 +98,19 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(
             "AI板块事件雷达"
         )
-        self.resize(
-            1360,
-            880,
-        )
-        self.setMinimumSize(
-            360,
-            600,
-        )
+
+        # On Android do not force a desktop geometry before child
+        # widgets exist; Qt may synchronously deliver resize events.
+        if is_android():
+            self.setMinimumSize(
+                320,
+                480,
+            )
+        else:
+            self.setMinimumSize(
+                360,
+                600,
+            )
 
         self._build_ui()
         self._connect_signals()
@@ -109,7 +118,15 @@ class MainWindow(QMainWindow):
             get_app_style()
         )
 
+        if not is_android():
+            self.resize(
+                1360,
+                880,
+            )
+
         self.refresh_database_views()
+
+        self._ui_ready = True
         self._apply_responsive_layout()
 
     # =========================================================
@@ -526,12 +543,46 @@ class MainWindow(QMainWindow):
         self,
         event,
     ):
-        super().resizeEvent(event)
-        self._apply_responsive_layout()
+        """
+        Keep Python exceptions from escaping a Qt virtual override.
+
+        RC4.15 logcat showed a Shiboken native crash while handling
+        a Python QWidget event during an Android geometry change.
+        """
+        try:
+            super().resizeEvent(
+                event
+            )
+        except Exception:
+            self.logger.exception(
+                "Base resizeEvent failed"
+            )
+            return
+
+        if not getattr(
+            self,
+            "_ui_ready",
+            False,
+        ):
+            return
+
+        try:
+            self._apply_responsive_layout()
+        except Exception:
+            self.logger.exception(
+                "Responsive layout failed during resizeEvent"
+            )
 
     def _apply_responsive_layout(
         self,
     ):
+        if not getattr(
+            self,
+            "_ui_ready",
+            False,
+        ):
+            return
+
         mode = self.config.ui_mode
 
         if mode == "desktop":

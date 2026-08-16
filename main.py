@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 
-APP_VERSION = "1.0.0-rc4.15"
+APP_VERSION = "1.0.0-rc4.16"
 
 
 def _task_id_from_args() -> int | None:
@@ -261,13 +261,18 @@ def _run_gui() -> int:
             )
             wizard.exec()
 
+    print("MainWindow stage: constructing")
+
     window = MainWindow(
         config=config,
         provider_manager=(
             provider_manager
         ),
     )
+
+    print("MainWindow stage: constructed")
     window.show()
+    print("MainWindow stage: shown")
 
     return app.exec()
 
