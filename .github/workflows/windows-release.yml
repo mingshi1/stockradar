@@ -43,7 +43,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Windows-Diagnostics-1.0.0-rc4.5
+          name: StockEventRadar-Windows-Diagnostics-1.0.0-rc4.6
           if-no-files-found: ignore
           path: |
             pysidedeploy.spec
@@ -63,11 +63,11 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Windows-1.0.0-rc4.5
+          name: StockEventRadar-Windows-1.0.0-rc4.6
           if-no-files-found: error
           path: |
             dist/StockEventRadar.exe
-            installer/output/StockEventRadar-Setup-1.0.0-rc4.5.exe
+            installer/output/StockEventRadar-Setup-1.0.0-rc4.6.exe
 
       - name: Publish GitHub Release asset
         if: startsWith(github.ref, 'refs/tags/')
@@ -85,5 +85,5 @@ jobs:
 
           gh release upload $tag `
             "dist/StockEventRadar.exe" `
-            "installer/output/StockEventRadar-Setup-1.0.0-rc4.5.exe" `
+            "installer/output/StockEventRadar-Setup-1.0.0-rc4.6.exe" `
             --clobber

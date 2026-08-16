@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.0-rc4.6
+
+### Android artifact collection fix
+- RC4.5 的 `Build Android APK Beta` 已成功返回 0。
+- 失败发生在我们自己的 `Collect APK/AAB` 步骤，而不是 Android 编译命令。
+- 移除 `find . -maxdepth 8` 的目录深度限制。
+- `build_android.sh` 现在在构建完成后主动搜索：
+  - 应用项目目录
+  - `$RUNNER_TEMP`
+  - `$HOME/.buildozer`
+  - `$HOME/.pyside6-android-deploy`
+- 仅收集本次构建开始后新生成的 `.apk` / `.aab`。
+- 找到后统一复制到 `android-output/`。
+- 找不到时打印 Buildozer/Gradle 常见输出目录和最近的大文件，方便下一轮诊断。
+- workflow 的后置步骤只负责验证 `android-output/`。
+- Artifact 更新为 `StockEventRadar-Android-Beta-1.0.0-rc4.6`。
+
 ## 1.0.0-rc4.5
 
 ### Android deploy project-scan fix
