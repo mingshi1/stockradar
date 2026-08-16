@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.0-rc4.7
+
+### Android Python ABI fix
+- RC4.6 诊断日志显示 python-for-android 实际构建了 Python 3.14.2：
+  `hostpython3 v3.14.2` / `python3 v3.14.2`。
+- 官方 Qt Android wheels 是 `cp311`，因此 Android 目标 Python 必须保持 3.11。
+- Buildozer 环境强制：
+  `APP_REQUIREMENTS=python3==3.11.15,hostpython3==3.11.15,shiboken6,PySide6`。
+- 每次 Android build 前删除项目 `.buildozer`，避免继续复用 RC4.6 的 Python 3.14 缓存。
+- 构建前验证 host Python 为 3.11、两个 Android wheels 都是 cp311/aarch64。
+- 构建后检测是否意外出现 Python 3.14 路径，出现则立即失败并打印诊断。
+- Artifact 更新为 `StockEventRadar-Android-Beta-1.0.0-rc4.7`。
+
 ## 1.0.0-rc4.6
 
 ### Android artifact collection fix

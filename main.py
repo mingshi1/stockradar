@@ -14,7 +14,7 @@ from app.ui.main_window import MainWindow
 from app.ui.onboarding import FirstRunWizard
 
 
-APP_VERSION = "1.0.0-rc4.6"
+APP_VERSION = "1.0.0-rc4.7"
 
 
 def _task_id_from_args() -> int | None:

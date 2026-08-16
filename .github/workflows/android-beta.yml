@@ -9,6 +9,7 @@ on:
 env:
   QT_FOR_PYTHON_VERSION: "6.11.1"
   QT_FOR_PYTHON_BRANCH: "6.11"
+  ANDROID_PYTHON_VERSION: "3.11.15"
   PYSIDE_ANDROID_WHEEL_URL: "https://download.qt.io/official_releases/QtForPython/pyside6/pyside6-6.11.1-6.11.1-cp311-cp311-android_aarch64.whl"
   SHIBOKEN_ANDROID_WHEEL_URL: "https://download.qt.io/official_releases/QtForPython/shiboken6/shiboken6-6.11.1-6.11.1-cp311-cp311-android_aarch64.whl"
 
@@ -253,7 +254,7 @@ jobs:
       - name: Upload Android Beta
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Beta-1.0.0-rc4.6
+          name: StockEventRadar-Android-Beta-1.0.0-rc4.7
           if-no-files-found: error
           path: android-output/*
 
@@ -261,11 +262,14 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.6
+          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.7
           if-no-files-found: ignore
           include-hidden-files: true
           path: |
             pysidedeploy.spec
+            buildozer.spec
+            .android-artifacts-found.txt
+            .android-build-start
             .buildozer/**
             deployment/**
             android-output/**

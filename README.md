@@ -1,4 +1,4 @@
-# AI板块事件雷达 v1.0.0-rc4.6.1
+# AI板块事件雷达 v1.0.0-rc4.7.1
 
 V0.9 的主题是：
 
@@ -175,8 +175,8 @@ Windows 可以：
 或者：
 
 ```text
-git tag v1.0.0-rc4.6.1
-git push origin v1.0.0-rc4.6.1
+git tag v1.0.0-rc4.7.1
+git push origin v1.0.0-rc4.7.1
 ```
 
 触发 Release 构建。
@@ -339,7 +339,7 @@ V1.0 不再大改架构。
 
 ---
 
-# V1.0.0 RC4.6 Hotfix
+# V1.0.0 RC4.7 Hotfix
 
 本修订专门修复两项 V0.9 Windows 测试问题：
 
@@ -376,7 +376,7 @@ Unblock-File .\scripts\build_windows.ps1
 
 ---
 
-# V1.0.0 RC4.6 Windows Build Hotfix
+# V1.0.0 RC4.7 Windows Build Hotfix
 
 如果旧版构建日志出现：
 
@@ -389,7 +389,7 @@ FileNotFoundError:
 
 说明 Nuitka 编译已经成功，失败发生在最终复制阶段。
 
-V1.0.0 RC4.6 会在编译前创建：
+V1.0.0 RC4.7 会在编译前创建：
 
 ```text
 dist\
@@ -413,7 +413,7 @@ dist\StockEventRadar.exe
 
 ---
 
-# V1.0.0 RC4.6：Windows 构建缓存转移到 D 盘
+# V1.0.0 RC4.7：Windows 构建缓存转移到 D 盘
 
 默认大型构建工作区：
 
@@ -455,7 +455,7 @@ D:\coding\stock-event-radar
 
 ---
 
-# V1.0.0 RC4.6：自动任务中心
+# V1.0.0 RC4.7：自动任务中心
 
 本候选版新增：
 
@@ -479,7 +479,7 @@ V1_RC1_TEST_PLAN.md
 
 ---
 
-# V1.0.0 RC4.6
+# V1.0.0 RC4.7
 
 RC3 将邮件/SMTP功能从正式范围中移除，聚焦：
 - 自动定时分析
@@ -498,7 +498,7 @@ RC3 将邮件/SMTP功能从正式范围中移除，聚焦：
 
 ---
 
-# V1.0.0 RC4.6
+# V1.0.0 RC4.7
 
 RC4 重点是发布流水线可靠性：
 
@@ -514,7 +514,7 @@ RC4 重点是发布流水线可靠性：
 
 ---
 
-# V1.0.0 RC4.6
+# V1.0.0 RC4.7
 
 Android CI 继续修复 Qt 官方交叉编译工具依赖：
 
@@ -527,7 +527,7 @@ Android CI 继续修复 Qt 官方交叉编译工具依赖：
 
 ---
 
-# V1.0.0 RC4.6
+# V1.0.0 RC4.7
 
 Android CI 已经进入真正 APK 构建阶段。
 RC4.4 自动安装 PySide6 自带的 Android deploy runtime requirements，
@@ -538,7 +538,7 @@ RC4.4 自动安装 PySide6 自带的 Android deploy runtime requirements，
 
 ---
 
-# V1.0.0 RC4.6
+# V1.0.0 RC4.7
 
 Android deploy 修复项目扫描污染：
 Qt for Python 的 `pyside-setup` 工具源码不再 clone 到应用项目目录，
@@ -549,10 +549,21 @@ Qt for Python 的 `pyside-setup` 工具源码不再 clone 到应用项目目录�
 
 ---
 
-# V1.0.0 RC4.6
+# V1.0.0 RC4.7
 
 Android 编译命令已经成功，RC4.6 修复的是 APK/AAB 产物定位和收集逻辑。
 不再使用 `find . -maxdepth 8`，而是对本次构建新产物进行跨构建目录搜索，
 统一放入 `android-output/`。
 
 详见 `V1_RC4_6_TEST_PLAN.md`。
+
+
+---
+
+# V1.0.0 RC4.7
+
+RC4.6 的 Android 诊断显示 p4a 在 cp311 Qt wheel 下错误选择了 Python 3.14。
+RC4.7 强制 Android target python 与 hostpython 都使用 3.11.15，
+并清理旧 `.buildozer` 缓存，避免 ABI 错配。
+
+详见 `V1_RC4_7_TEST_PLAN.md`。
