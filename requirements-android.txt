@@ -1,5 +1,7 @@
 PySide6==6.11.1
-certifi==2026.5.20
+certifi==2026.7.22
 
-# Android HTTP uses stdlib urllib + a bundled CA bundle.
-# Desktop OpenAI SDK dependencies are intentionally excluded.
+# Android runtime networking uses app.ai.android_client (stdlib urllib)
+# with certifi's Mozilla CA bundle.
+# The desktop openai/httpx/pydantic dependency tree is intentionally
+# not included in the APK.

@@ -43,6 +43,7 @@ from app.ui.pages.system_page import SystemPage
 from app.ui.onboarding import FirstRunWizard
 from app.ui.styles import get_app_style
 from app.platform import is_android
+from app.ai.key_utils import key_diagnostic, normalize_api_key
 from app.logging_setup import LOG_DIR
 from app.ui.workers import (
     AnalysisWorker,
@@ -429,7 +430,7 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         version = QLabel(
-            "v1.0.0 RC4.14"
+            "v1.0.0 RC4.19"
         )
         version.setObjectName(
             "versionLabel"
@@ -1827,11 +1828,26 @@ class MainWindow(QMainWindow):
         model: str,
         base_url: str,
     ):
-        api_key = (
+        api_key = normalize_api_key(
             entered_api_key
             or self.config.get_api_key(
                 provider_name
             )
+        )
+
+        diag = key_diagnostic(
+            api_key
+        )
+        self.logger.info(
+            "MainWindow Key diagnostic "
+            "provider=%s %s",
+            provider_name,
+            diag.compact(),
+        )
+        self.settings_page.set_key_stage_diagnostic(
+            provider_name,
+            "主窗口收到",
+            api_key,
         )
 
         if not api_key:

@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from app.platform import is_android
+from app.ai.key_utils import normalize_api_key
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +46,10 @@ class AIProvider(ABC):
         base_url: str | None = None,
         timeout: float = 120.0,
     ) -> Any:
+        api_key = normalize_api_key(
+            api_key
+        )
+
         resolved_base_url = (
             base_url
             or self.info.default_base_url

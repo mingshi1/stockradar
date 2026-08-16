@@ -1,24 +1,60 @@
 # Changelog
 
+## 1.0.0-rc4.19
+
+### Android API Key end-to-end diagnostics
+- 已验证同一 DeepSeek Key 在：
+  - Windows StockEventRadar
+  - PowerShell Invoke-RestMethod
+  - Windows 上直接运行 AndroidOpenAICompat
+  均可成功认证。
+- 因此 Android 手机上的 401 重点转向 Key 输入/传递链路。
+- 新增 `app.ai.key_utils`：
+  - API Key 标准化
+  - SHA-256 前 12 位安全指纹
+  - 长度、末 4 位、ASCII 检测
+  - 不记录/显示完整 Key
+- 自动清理手机复制时可能混入的：
+  - BOM
+  - zero-width space / joiner
+  - word joiner
+  - soft hyphen
+  - CR/LF/TAB
+  - 首尾空白
+- Android Provider 页增加“从剪贴板粘贴 Key”按钮，
+  直接读取 Qt Clipboard 后清洗，减少安全输入法对粘贴的影响。
+- Android Key 输入框下显示安全诊断：
+  `35字符 · 指纹 cfb793fc4a63 · 末尾 5db9 · ASCII`
+- MainWindow、ConnectionWorker、Android HTTP transport 均再次计算并记录
+  同样的安全诊断，可确认 Key 在哪一层发生变化。
+- HTTP 401 错误弹窗会附带安全诊断，但不会泄露完整 Key。
+- SecretStore 保存和读取时也统一做 Key 标准化。
+- Windows 正常 API Key 不受影响。
+- Android UI 继续保持最小配置：模型 + API Key + 测试连接。
+
 ## 1.0.0-rc4.18
 
-### Android build pipeline
-- 修复 RC4.17 在真实 APK 构建前被 Qt helper 的固定字符串匹配误杀。
-- Qt helper 补丁改成 AST 结构化定位，不依赖原始空格、换行或默认值。
-- 如果未来 helper 结构再次变化，只警告，不在真实 build 前制造假失败。
-- Buildozer APP_REQUIREMENTS / APP_P4A_BRANCH 继续作为第二层保护。
-- 加入 certifi 2026.5.20，并继续固定 Python 3.11.15 / p4a v2026.05.09。
-
-### Android AI TLS
-- Android urllib 使用 certifi CA bundle。
-- 保持 TLS 证书验证，不关闭安全校验。
-- TLS 链仍异常时提示检查 HTTPS 代理、抓包、VPN 或网络环境。
-
-### Android AI settings
-- Android 每个 Provider 只显示：启用、模型、API Key、状态、测试。
-- 隐藏 Base URL、输入单价、输出单价和成本说明。
-- Android 不要求维护 Token 单价；Windows 桌面高级设置保持不变。
-- 继续只上传一个 APK。
+### Android HTTPS certificate + minimal AI settings
+- RC4.17 已稳定进入主界面，原生闪退问题不再是当前阻塞点。
+- DeepSeek 测试连接已真正发起 HTTPS 请求，但 Android 内置 Python
+  报 `CERTIFICATE_VERIFY_FAILED / self-signed certificate in certificate chain`。
+- Android APK 新增 `certifi==2026.7.22`。
+- Android HTTP client 使用 `ssl.create_default_context(cafile=certifi.where())`
+  显式加载 Mozilla CA bundle。
+- HTTPS 证书验证和 hostname checking 保持开启；不采用不安全的
+  `CERT_NONE` / `verify=False`。
+- 若 Mozilla CA 下仍验证失败，错误提示会明确建议检查 VPN、抓包代理、
+  HTTPS 过滤、公司/校园 Wi-Fi，并可切换 5G/其他网络测试。
+- Android AI 设置页大幅简化：
+  - 每个 Provider 只显示：参与分析、模型、API Key、连接状态、测试按钮
+  - Android 隐藏 Base URL，强制使用 Provider 官方默认 Base URL
+  - Android 隐藏输入/输出 Token 单价
+  - Android 保存时成本单价固定为 0，不做成本估算
+  - 隐藏手机端冗长成本提示和 Provider 说明
+  - 测试/保存按钮改为全宽触屏布局
+- Windows 版继续保留 Base URL 与 Token 成本配置，不改变桌面能力。
+- 继续只上传一个 APK：
+  `StockEventRadar-Android-arm64-v8a-debug.apk`。
 
 ## 1.0.0-rc4.17
 

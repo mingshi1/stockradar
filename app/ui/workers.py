@@ -1,6 +1,9 @@
+import logging
+
 from PySide6.QtCore import QThread, Signal
 
 from app.ai.manager import ProviderManager
+from app.ai.key_utils import key_diagnostic, normalize_api_key
 from app.analysis.service import AnalysisService
 
 
@@ -53,12 +56,26 @@ class ConnectionWorker(QThread):
 
         self.provider_manager = provider_manager
         self.provider_name = provider_name
-        self.api_key = api_key
+        self.api_key = normalize_api_key(
+            api_key
+        )
         self.model = model
         self.base_url = base_url
 
     def run(self):
         try:
+            diag = key_diagnostic(
+                self.api_key
+            )
+            logging.getLogger(
+                "StockEventRadar"
+            ).info(
+                "ConnectionWorker Key diagnostic "
+                "provider=%s %s",
+                self.provider_name,
+                diag.compact(),
+            )
+
             provider = self.provider_manager.get(
                 self.provider_name
             )
@@ -71,8 +88,13 @@ class ConnectionWorker(QThread):
             self.success.emit(result)
 
         except Exception as exc:
+            diag = key_diagnostic(
+                self.api_key
+            )
             self.error_occurred.emit(
-                str(exc)
+                f"{exc}"
+                f"\n\nWorker Key诊断："
+                f"{diag.compact()}"
             )
 
 

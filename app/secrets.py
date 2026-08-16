@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.platform import is_android
+from app.ai.key_utils import normalize_api_key
 
 
 class SecretStore:
@@ -32,7 +33,9 @@ class SecretStore:
         return self._keyring is not None
 
     def set(self, key: str, value: str):
-        value = value.strip()
+        value = normalize_api_key(
+            value
+        )
 
         if not value:
             return
@@ -48,9 +51,17 @@ class SecretStore:
 
     def get(self, key: str) -> str | None:
         if self._keyring is not None:
-            return self._keyring.get_password(
+            value = self._keyring.get_password(
                 self.service_name,
                 key,
             )
+        else:
+            value = self._memory.get(
+                key
+            )
 
-        return self._memory.get(key)
+        normalized = normalize_api_key(
+            value
+        )
+
+        return normalized or None

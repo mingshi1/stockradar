@@ -1,4 +1,4 @@
-# AI板块事件雷达 v1.0.0-rc4.18.1
+# AI板块事件雷达 v1.0.0-rc4.19.1
 
 V0.9 的主题是：
 
@@ -175,8 +175,8 @@ Windows 可以：
 或者：
 
 ```text
-git tag v1.0.0-rc4.18.1
-git push origin v1.0.0-rc4.18.1
+git tag v1.0.0-rc4.19.1
+git push origin v1.0.0-rc4.19.1
 ```
 
 触发 Release 构建。
@@ -339,7 +339,7 @@ V1.0 不再大改架构。
 
 ---
 
-# V1.0.0 RC4.18 Hotfix
+# V1.0.0 RC4.19 Hotfix
 
 本修订专门修复两项 V0.9 Windows 测试问题：
 
@@ -376,7 +376,7 @@ Unblock-File .\scripts\build_windows.ps1
 
 ---
 
-# V1.0.0 RC4.18 Windows Build Hotfix
+# V1.0.0 RC4.19 Windows Build Hotfix
 
 如果旧版构建日志出现：
 
@@ -389,7 +389,7 @@ FileNotFoundError:
 
 说明 Nuitka 编译已经成功，失败发生在最终复制阶段。
 
-V1.0.0 RC4.18 会在编译前创建：
+V1.0.0 RC4.19 会在编译前创建：
 
 ```text
 dist\
@@ -413,7 +413,7 @@ dist\StockEventRadar.exe
 
 ---
 
-# V1.0.0 RC4.18：Windows 构建缓存转移到 D 盘
+# V1.0.0 RC4.19：Windows 构建缓存转移到 D 盘
 
 默认大型构建工作区：
 
@@ -455,7 +455,7 @@ D:\coding\stock-event-radar
 
 ---
 
-# V1.0.0 RC4.18：自动任务中心
+# V1.0.0 RC4.19：自动任务中心
 
 本候选版新增：
 
@@ -479,7 +479,7 @@ V1_RC1_TEST_PLAN.md
 
 ---
 
-# V1.0.0 RC4.18
+# V1.0.0 RC4.19
 
 RC3 将邮件/SMTP功能从正式范围中移除，聚焦：
 - 自动定时分析
@@ -498,7 +498,7 @@ RC3 将邮件/SMTP功能从正式范围中移除，聚焦：
 
 ---
 
-# V1.0.0 RC4.18
+# V1.0.0 RC4.19
 
 RC4 重点是发布流水线可靠性：
 
@@ -514,7 +514,7 @@ RC4 重点是发布流水线可靠性：
 
 ---
 
-# V1.0.0 RC4.18
+# V1.0.0 RC4.19
 
 Android CI 继续修复 Qt 官方交叉编译工具依赖：
 
@@ -527,7 +527,7 @@ Android CI 继续修复 Qt 官方交叉编译工具依赖：
 
 ---
 
-# V1.0.0 RC4.18
+# V1.0.0 RC4.19
 
 Android CI 已经进入真正 APK 构建阶段。
 RC4.4 自动安装 PySide6 自带的 Android deploy runtime requirements，
@@ -538,7 +538,7 @@ RC4.4 自动安装 PySide6 自带的 Android deploy runtime requirements，
 
 ---
 
-# V1.0.0 RC4.18
+# V1.0.0 RC4.19
 
 Android deploy 修复项目扫描污染：
 Qt for Python 的 `pyside-setup` 工具源码不再 clone 到应用项目目录，
@@ -549,7 +549,7 @@ Qt for Python 的 `pyside-setup` 工具源码不再 clone 到应用项目目录�
 
 ---
 
-# V1.0.0 RC4.18
+# V1.0.0 RC4.19
 
 Android 编译命令已经成功，RC4.6 修复的是 APK/AAB 产物定位和收集逻辑。
 不再使用 `find . -maxdepth 8`，而是对本次构建新产物进行跨构建目录搜索，
@@ -560,7 +560,7 @@ Android 编译命令已经成功，RC4.6 修复的是 APK/AAB 产物定位和收
 
 ---
 
-# V1.0.0 RC4.18
+# V1.0.0 RC4.19
 
 RC4.6 的 Android 诊断显示 p4a 在 cp311 Qt wheel 下错误选择了 Python 3.14。
 RC4.7 强制 Android target python 与 hostpython 都使用 3.11.15，
@@ -571,7 +571,7 @@ RC4.7 强制 Android target python 与 hostpython 都使用 3.11.15，
 
 ---
 
-# V1.0.0 RC4.18
+# V1.0.0 RC4.19
 
 RC4.7 的 0 秒失败来自我们自己的 wheel 文件名检查，而不是 Qt wheel 错误。
 RC4.8 保留 Qt 官方 wheel 原始文件名，并使用 Python Packaging
@@ -582,7 +582,7 @@ RC4.8 保留 Qt 官方 wheel 原始文件名，并使用 Python Packaging
 
 ---
 
-# V1.0.0 RC4.18
+# V1.0.0 RC4.19
 
 Android CI 不再把 p4a 仓库中的 Python 3.14 补丁文件误判成
 “实际正在构建 Python 3.14”。
@@ -595,7 +595,7 @@ RC4.9 固定 p4a 正式 release、固定 cp311 target/hostpython，
 
 ---
 
-# V1.0.0 RC4.18
+# V1.0.0 RC4.19
 
 Android 完整日志已把真实失败定位到 python-for-android 的 libffi
 autotools 阶段：`LT_SYS_SYMBOL_USCORE` 宏不可用。
@@ -609,7 +609,7 @@ RC4.10 在 Ubuntu Runner 中显式安装完整 native build prerequisites，
 
 ---
 
-# V1.0.0 RC4.18
+# V1.0.0 RC4.19
 
 Android APK 已经成功生成并安装，当前进入实机运行兼容阶段。
 
@@ -621,7 +621,7 @@ Android API 请求使用标准库 HTTP client，并加入启动错误可见诊�
 
 ---
 
-# V1.0.0 RC4.18
+# V1.0.0 RC4.19
 
 Android GitHub Artifact 现在只保留一个：
 
@@ -637,7 +637,7 @@ RC4.11 在荣耀手机仍为无提示闪退，因此下一步使用 ADB Logcat
 
 ---
 
-# V1.0.0 RC4.18
+# V1.0.0 RC4.19
 
 修复 RC4.12 Android GitHub Actions YAML 缩进错误。
 RC4.12 的 0 秒失败发生在 workflow 解析阶段，Android 构建没有运行。
@@ -653,7 +653,7 @@ StockEventRadar-Android-arm64-v8a-debug.apk
 
 ---
 
-# V1.0.0 RC4.18
+# V1.0.0 RC4.19
 
 Android 已进入实机 UI 优化阶段。
 
@@ -675,7 +675,7 @@ StockEventRadar-Android-arm64-v8a-debug.apk
 
 ---
 
-# V1.0.0 RC4.18
+# V1.0.0 RC4.19
 
 修复 Python 3.11 Android 平台识别。
 
@@ -696,7 +696,7 @@ p4a 环境变量进行可靠识别。
 
 ---
 
-# V1.0.0 RC4.18
+# V1.0.0 RC4.19
 
 荣耀真机 ADB 已定位 native 闪退到 MainWindow 初始化期的
 Qt geometry/resize 事件与 Python resizeEvent override 路径。
@@ -707,7 +707,7 @@ RC4.16 重排初始化顺序并增加 `_ui_ready` 防护。
 
 ---
 
-# V1.0.0 RC4.18
+# V1.0.0 RC4.19
 
 荣耀真机仍显示 Shiboken virtual-override native crash。
 RC4.17 从 Android 运行路径彻底移除应用自定义的
@@ -719,8 +719,28 @@ RC4.17 从 Android 运行路径彻底移除应用自定义的
 
 ---
 
-# V1.0.0 RC4.18
+# V1.0.0 RC4.19
 
-修复 RC4.17 Android workflow 的脆弱 Qt helper 字符串匹配。
-Android AI 设置页精简为必要项，并使用打包 CA bundle 做 TLS 校验。
-继续保持单 APK 输出。
+Android AI 网络层新增 certifi Mozilla CA bundle，
+修复嵌入式 Python HTTPS 证书信任问题。
+
+Android AI 设置页改为最小配置：
+模型 + API Key + 是否参与分析 + 测试连接。
+手机端不再显示 Base URL 与 Token 成本单价。
+
+Windows 继续保留完整设置。
+
+
+---
+
+# V1.0.0 RC4.19
+
+Android API Key 增加端到端安全指纹诊断与剪贴板直粘。
+
+已知当前有效 DeepSeek Key 安全特征：
+
+```text
+35字符 / cfb793fc4a63 / 末尾5db9
+```
+
+手机端可直接比较这一特征，而不暴露完整 Key。
