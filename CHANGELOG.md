@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.0.0-rc4.23
+
+### Fix Android “保存任务”无反馈
+- Android 自动任务保存流程从 Windows Task Scheduler 流程中彻底分离。
+- Android 点击“保存任务”后：
+  - 立即在按钮下显示“正在保存任务…”
+  - 写入本机 SQLite
+  - 立即刷新已保存任务列表
+  - 显示绿色“✓ 任务 #N 已保存到本机”
+  - 不调用 `WindowsTaskScheduler.register_daily()`
+- Android 删除任务也不再调用 Windows Task Scheduler。
+- Windows 桌面版仍保持：
+  SQLite 保存 + Windows Task Scheduler 注册/注销。
+- 自动任务正在运行或处于 5 分钟网络重试等待期间：
+  - “立即执行”保持禁用，避免并发运行
+  - “保存任务”保持可用
+  - “新建任务”保持可用
+- 保存当前任务配置不会改变已经开始执行的那一次任务；
+  当前运行/等待重试使用启动时已经取得的请求快照。
+- 保存错误会在编辑器按钮旁直接显示红色反馈，不再只依赖弹窗。
+- RC4.22 的：
+  - 5 分钟网络失败单次重试
+  - Android 历史报告纵向布局
+  - Android 自动任务窄屏表格
+  - 触屏滚动
+  均继续保留。
+
 ## 1.0.0-rc4.22
 
 ### Android history/automation layout + scheduled network retry

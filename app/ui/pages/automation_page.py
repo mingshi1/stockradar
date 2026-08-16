@@ -389,9 +389,30 @@ class AutomationPage(QWidget):
 
         form.addRow("", buttons)
 
+        self.save_feedback = QLabel()
+        self.save_feedback.setObjectName(
+            "statusLabel"
+        )
+        self.save_feedback.setWordWrap(
+            True
+        )
+        self.save_feedback.setVisible(
+            False
+        )
+
+        form.addRow(
+            "",
+            self.save_feedback,
+        )
+
         self.layout.addWidget(group)
 
     def _emit_save_task(self):
+        self.set_save_feedback(
+            "正在保存任务…",
+            success=None,
+        )
+
         name = self.task_name.text().strip()
         sectors = self._parse_sectors(
             self.sectors_edit.toPlainText()
@@ -472,6 +493,15 @@ class AutomationPage(QWidget):
 
     def clear_task_editor(self):
         self._selected_task_id = None
+
+        if hasattr(
+            self,
+            "save_feedback",
+        ):
+            self.set_save_feedback(
+                "",
+                success=None,
+            )
         self.task_name.setText(
             "每日晨报"
         )
@@ -801,16 +831,52 @@ class AutomationPage(QWidget):
         running: bool,
         message: str = "",
     ):
+        # Prevent starting a second execution, but keep editing/saving
+        # available while the current task runs or waits for retry.
         self.run_now_button.setEnabled(
             not running
         )
+
         self.save_task_button.setEnabled(
-            not running
+            True
+        )
+        self.new_task_button.setEnabled(
+            True
         )
 
         if message:
             self.task_status.setText(
                 message
+            )
+
+    def set_save_feedback(
+        self,
+        message: str,
+        *,
+        success: bool | None = None,
+    ):
+        text = str(
+            message or ""
+        ).strip()
+
+        self.save_feedback.setText(
+            text
+        )
+        self.save_feedback.setVisible(
+            bool(text)
+        )
+
+        if success is True:
+            self.save_feedback.setStyleSheet(
+                "color:#15803d;font-weight:600;"
+            )
+        elif success is False:
+            self.save_feedback.setStyleSheet(
+                "color:#b91c1c;font-weight:600;"
+            )
+        else:
+            self.save_feedback.setStyleSheet(
+                ""
             )
 
     def apply_task_progress(

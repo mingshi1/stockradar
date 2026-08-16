@@ -456,7 +456,7 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         version = QLabel(
-            "v1.0.0 RC4.22"
+            "v1.0.0 RC4.23"
         )
         version.setObjectName(
             "versionLabel"
@@ -1390,10 +1390,19 @@ class MainWindow(QMainWindow):
         )
 
         if not sectors:
+            message = (
+                "自动任务至少需要一个分析板块。"
+            )
+
+            self.automation_page.set_save_feedback(
+                message,
+                success=False,
+            )
+
             QMessageBox.warning(
                 self,
                 "无法保存",
-                "自动任务至少需要一个分析板块。",
+                message,
             )
             return
 
@@ -1405,14 +1414,62 @@ class MainWindow(QMainWindow):
                 )
             )
         except Exception as exc:
+            message = str(
+                exc
+            )
+
+            self.automation_page.set_save_feedback(
+                f"保存失败：{message}",
+                success=False,
+            )
+
             QMessageBox.critical(
                 self,
                 "保存任务失败",
-                str(exc),
+                message,
             )
             return
 
-        if payload.get("enabled"):
+        # Android beta currently has no reliable system-level scheduler.
+        # Saving a task must therefore be a normal local SQLite action and
+        # must never be treated as a Windows Task Scheduler failure.
+        if is_android():
+            self.refresh_automation_views()
+
+            state_text = (
+                "已启用"
+                if payload.get(
+                    "enabled"
+                )
+                else "已停用"
+            )
+
+            self.automation_page.set_save_feedback(
+                (
+                    f"✓ 任务 #{task_id} 已保存到本机。"
+                    f" 当前状态：{state_text}。"
+                    "可使用“立即执行”测试；"
+                    "Android 系统级后台调度尚未启用。"
+                ),
+                success=True,
+            )
+
+            self.logger.info(
+                "Android scheduled task saved locally "
+                "| task_id=%s enabled=%s",
+                task_id,
+                bool(
+                    payload.get(
+                        "enabled"
+                    )
+                ),
+            )
+            return
+
+        # Desktop Windows keeps the original system scheduler behavior.
+        if payload.get(
+            "enabled"
+        ):
             success, message = (
                 self.task_scheduler
                 .register_daily(
@@ -1428,12 +1485,19 @@ class MainWindow(QMainWindow):
         else:
             success, message = (
                 self.task_scheduler
-                .unregister(task_id)
+                .unregister(
+                    task_id
+                )
             )
 
         self.refresh_automation_views()
 
         if success:
+            self.automation_page.set_save_feedback(
+                f"✓ 自动任务 #{task_id} 已保存。",
+                success=True,
+            )
+
             QMessageBox.information(
                 self,
                 "任务已保存",
@@ -1441,12 +1505,25 @@ class MainWindow(QMainWindow):
                     f"自动任务 #{task_id} 已保存。\n\n"
                     + (
                         "Windows 每日计划任务已经注册。"
-                        if payload.get("enabled")
-                        else "任务已停用，Windows 计划任务已移除。"
+                        if payload.get(
+                            "enabled"
+                        )
+                        else (
+                            "任务已停用，Windows "
+                            "计划任务已移除。"
+                        )
                     )
                 ),
             )
         else:
+            self.automation_page.set_save_feedback(
+                (
+                    f"任务 #{task_id} 已写入数据库，"
+                    "但 Windows 系统调度注册失败。"
+                ),
+                success=False,
+            )
+
             QMessageBox.warning(
                 self,
                 "任务已保存，但系统调度未完成",
@@ -1474,9 +1551,11 @@ class MainWindow(QMainWindow):
         ):
             return
 
-        self.task_scheduler.unregister(
-            task_id
-        )
+        if not is_android():
+            self.task_scheduler.unregister(
+                task_id
+            )
+
         self.database.delete_scheduled_task(
             task_id
         )

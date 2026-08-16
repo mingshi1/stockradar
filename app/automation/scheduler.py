@@ -24,7 +24,7 @@ class WindowsTaskScheduler:
         if not self.supported:
             return (
                 False,
-                "当前 RC1 仅在 Windows 上注册系统级每日计划任务。",
+                "系统级每日计划任务仅由 Windows Task Scheduler 提供。",
             )
 
         command = self._task_command(task_id)
