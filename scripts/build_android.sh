@@ -108,7 +108,7 @@ EXTRA_IGNORE_DIRS="android-wheels,android-output,deployment,dist,installer,.git,
 
 # Double protection: Buildozer officially supports SECTION_OPTION
 # environment overrides. The installed Qt helper is also patched in CI.
-export APP_REQUIREMENTS="python3==${ANDROID_PYTHON_VERSION},hostpython3==${ANDROID_PYTHON_VERSION},shiboken6,PySide6"
+export APP_REQUIREMENTS="python3==${ANDROID_PYTHON_VERSION},hostpython3==${ANDROID_PYTHON_VERSION},shiboken6,PySide6,certifi==2026.7.22"
 export APP_P4A_BRANCH="$P4A_RELEASE"
 export BUILDOZER_LOG_LEVEL="2"
 

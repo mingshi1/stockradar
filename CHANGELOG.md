@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.0.0-rc4.18
+
+### Android HTTPS certificate + minimal AI settings
+- RC4.17 已稳定进入主界面，原生闪退问题不再是当前阻塞点。
+- DeepSeek 测试连接已真正发起 HTTPS 请求，但 Android 内置 Python
+  报 `CERTIFICATE_VERIFY_FAILED / self-signed certificate in certificate chain`。
+- Android APK 新增 `certifi==2026.7.22`。
+- Android HTTP client 使用 `ssl.create_default_context(cafile=certifi.where())`
+  显式加载 Mozilla CA bundle。
+- HTTPS 证书验证和 hostname checking 保持开启；不采用不安全的
+  `CERT_NONE` / `verify=False`。
+- 若 Mozilla CA 下仍验证失败，错误提示会明确建议检查 VPN、抓包代理、
+  HTTPS 过滤、公司/校园 Wi-Fi，并可切换 5G/其他网络测试。
+- Android AI 设置页大幅简化：
+  - 每个 Provider 只显示：参与分析、模型、API Key、连接状态、测试按钮
+  - Android 隐藏 Base URL，强制使用 Provider 官方默认 Base URL
+  - Android 隐藏输入/输出 Token 单价
+  - Android 保存时成本单价固定为 0，不做成本估算
+  - 隐藏手机端冗长成本提示和 Provider 说明
+  - 测试/保存按钮改为全宽触屏布局
+- Windows 版继续保留 Base URL 与 Token 成本配置，不改变桌面能力。
+- 继续只上传一个 APK：
+  `StockEventRadar-Android-arm64-v8a-debug.apk`。
+
 ## 1.0.0-rc4.17
 
 ### Android Shiboken virtual-override stability pass

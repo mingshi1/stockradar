@@ -45,23 +45,32 @@ class SettingsPage(QWidget):
     def _build_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(
-            40,
-            25,
-            40,
-            25,
+            12 if is_android() else 40,
+            12 if is_android() else 25,
+            12 if is_android() else 40,
+            16 if is_android() else 25,
         )
         layout.setSpacing(12)
 
         title = QLabel(
-            "AI 模型与成本设置"
+            "AI 模型设置"
+            if is_android()
+            else "AI 模型与成本设置"
         )
         title.setObjectName(
             "pageTitle"
         )
 
         description = QLabel(
-            "配置国产 Multi-AI、联网研究 Provider，以及可选的 Token 单价。"
-            "单价完全由你维护，软件不会把可能过期的官方价格硬编码进去。"
+            (
+                "Android 版只保留必要配置：选择模型、填写 API Key、测试连接。"
+                "Base URL 自动使用各 Provider 官方默认值，不在手机端配置成本单价。"
+            )
+            if is_android()
+            else (
+                "配置国产 Multi-AI、联网研究 Provider，以及可选的 Token 单价。"
+                "单价完全由你维护，软件不会把可能过期的官方价格硬编码进去。"
+            )
         )
         description.setWordWrap(True)
         description.setObjectName(
@@ -81,10 +90,10 @@ class SettingsPage(QWidget):
             global_card
         )
         global_layout.setContentsMargins(
-            22,
-            15,
-            22,
-            15,
+            14 if is_android() else 22,
+            12 if is_android() else 15,
+            14 if is_android() else 22,
+            12 if is_android() else 15,
         )
         global_layout.setSpacing(8)
 
@@ -192,9 +201,10 @@ class SettingsPage(QWidget):
         hint.setObjectName(
             "statusLabel"
         )
-        global_layout.addWidget(
-            hint
-        )
+        if not is_android():
+            global_layout.addWidget(
+                hint
+            )
 
         layout.addWidget(
             global_card
@@ -234,13 +244,20 @@ class SettingsPage(QWidget):
         save_button.clicked.connect(
             self._emit_save
         )
-        save_row.addWidget(
-            save_button
-        )
-
-        layout.addLayout(
-            save_row
-        )
+        if is_android():
+            save_button.setMinimumHeight(
+                44
+            )
+            layout.addWidget(
+                save_button
+            )
+        else:
+            save_row.addWidget(
+                save_button
+            )
+            layout.addLayout(
+                save_row
+            )
 
     def _create_provider_tab(
         self,
@@ -253,10 +270,10 @@ class SettingsPage(QWidget):
         tab = QWidget()
         layout = QVBoxLayout(tab)
         layout.setContentsMargins(
-            18,
-            16,
-            18,
-            16,
+            12 if is_android() else 18,
+            12 if is_android() else 16,
+            12 if is_android() else 18,
+            12 if is_android() else 16,
         )
         layout.setSpacing(10)
 
@@ -321,34 +338,47 @@ class SettingsPage(QWidget):
         )
 
         if is_android():
-            rows = [
-                ("模型", model_combo),
-                ("Base URL", base_input),
-                ("API Key", api_input),
-                ("输入单价*", input_price),
-                ("输出单价*", output_price),
-            ]
+            # Mobile: intentionally minimal.  Base URL and price
+            # controls still exist internally for config compatibility,
+            # but they are not placed in the Android UI.
+            model_label = QLabel(
+                "模型"
+            )
+            key_label = QLabel(
+                "API Key"
+            )
 
             grid.setColumnStretch(
                 0,
                 1,
             )
+            grid.addWidget(
+                model_label,
+                0,
+                0,
+            )
+            grid.addWidget(
+                model_combo,
+                1,
+                0,
+            )
+            grid.addWidget(
+                key_label,
+                2,
+                0,
+            )
+            grid.addWidget(
+                api_input,
+                3,
+                0,
+            )
 
-            for row_index, (
-                label_text,
-                widget,
-            ) in enumerate(rows):
-                label_row = row_index * 2
-                grid.addWidget(
-                    QLabel(label_text),
-                    label_row,
-                    0,
-                )
-                grid.addWidget(
-                    widget,
-                    label_row + 1,
-                    0,
-                )
+            model_combo.setMinimumHeight(
+                40
+            )
+            api_input.setMinimumHeight(
+                40
+            )
         else:
             grid.addWidget(
                 QLabel("模型"),
@@ -413,9 +443,10 @@ class SettingsPage(QWidget):
         price_hint.setObjectName(
             "statusLabel"
         )
-        layout.addWidget(
-            price_hint
-        )
+        if not is_android():
+            layout.addWidget(
+                price_hint
+            )
 
         status = QLabel(
             "尚未测试连接"
@@ -442,18 +473,29 @@ class SettingsPage(QWidget):
             self._emit_test(name)
         )
 
-        button_row.addWidget(
-            test_button
-        )
-        layout.addLayout(
-            button_row
-        )
+        if is_android():
+            test_button.setMinimumHeight(
+                42
+            )
+            layout.addWidget(
+                test_button
+            )
+        else:
+            button_row.addWidget(
+                test_button
+            )
+            layout.addLayout(
+                button_row
+            )
 
         specific_hint = self._provider_hint(
             provider_name
         )
 
-        if specific_hint:
+        if (
+            specific_hint
+            and not is_android()
+        ):
             label = QLabel(
                 specific_hint
             )
@@ -553,31 +595,44 @@ class SettingsPage(QWidget):
                 )
             )
             widgets["base_url"].setText(
-                str(
-                    saved.get(
-                        "base_url",
-                        info.default_base_url,
+                (
+                    info.default_base_url
+                    if is_android()
+                    else str(
+                        saved.get(
+                            "base_url",
+                            info.default_base_url,
+                        )
                     )
                 )
             )
-            widgets["input_price"].setValue(
-                float(
-                    saved.get(
-                        "input_price_per_million",
-                        0.0,
-                    )
-                    or 0.0
+
+            if is_android():
+                widgets["input_price"].setValue(
+                    0.0
                 )
-            )
-            widgets["output_price"].setValue(
-                float(
-                    saved.get(
-                        "output_price_per_million",
-                        0.0,
-                    )
-                    or 0.0
+                widgets["output_price"].setValue(
+                    0.0
                 )
-            )
+            else:
+                widgets["input_price"].setValue(
+                    float(
+                        saved.get(
+                            "input_price_per_million",
+                            0.0,
+                        )
+                        or 0.0
+                    )
+                )
+                widgets["output_price"].setValue(
+                    float(
+                        saved.get(
+                            "output_price_per_million",
+                            0.0,
+                        )
+                        or 0.0
+                    )
+                )
 
             self._refresh_key_placeholder(
                 provider_name
@@ -621,9 +676,13 @@ class SettingsPage(QWidget):
                     .strip()
                 ),
                 "base_url": (
-                    widgets["base_url"]
-                    .text()
-                    .strip()
+                    self.provider_manager
+                    .info(provider_name)
+                    .default_base_url
+                    if is_android()
+                    else widgets[
+                        "base_url"
+                    ].text().strip()
                 ),
                 "api_key": (
                     widgets["api_key"]
@@ -631,12 +690,18 @@ class SettingsPage(QWidget):
                     .strip()
                 ),
                 "input_price_per_million": (
-                    widgets["input_price"]
-                    .value()
+                    0.0
+                    if is_android()
+                    else widgets[
+                        "input_price"
+                    ].value()
                 ),
                 "output_price_per_million": (
-                    widgets["output_price"]
-                    .value()
+                    0.0
+                    if is_android()
+                    else widgets[
+                        "output_price"
+                    ].value()
                 ),
             }
 
@@ -681,9 +746,15 @@ class SettingsPage(QWidget):
             widgets["model"]
             .currentText()
             .strip(),
-            widgets["base_url"]
-            .text()
-            .strip(),
+            (
+                self.provider_manager
+                .info(provider_name)
+                .default_base_url
+                if is_android()
+                else widgets[
+                    "base_url"
+                ].text().strip()
+            ),
         )
 
     def mark_saved(self):

@@ -39,13 +39,13 @@ def main():
 
     old_requirements = (
         'self.set_value("app", "requirements", '
-        '"python3,shiboken6,PySide6")'
+        '"python3,shiboken6,PySide6,certifi==2026.7.22")'
     )
     new_requirements = (
         'self.set_value("app", "requirements", '
         f'"python3=={ANDROID_PYTHON_VERSION},'
         f'hostpython3=={ANDROID_PYTHON_VERSION},'
-        'shiboken6,PySide6")'
+        'shiboken6,PySide6,certifi==2026.7.22")'
     )
 
     if old_requirements in text:
@@ -90,6 +90,7 @@ def main():
         f"python3=={ANDROID_PYTHON_VERSION}",
         f"hostpython3=={ANDROID_PYTHON_VERSION}",
         P4A_RELEASE,
+        "certifi==2026.7.22",
     ]
 
     for fragment in required_fragments:
@@ -104,7 +105,7 @@ def main():
         "  requirements = "
         f"python3=={ANDROID_PYTHON_VERSION},"
         f"hostpython3=={ANDROID_PYTHON_VERSION},"
-        "shiboken6,PySide6"
+        "shiboken6,PySide6,certifi==2026.7.22"
     )
     print(f"  p4a.branch = {P4A_RELEASE}")
 

@@ -1,3 +1,7 @@
 PySide6==6.11.1
-# Android runtime networking uses app.ai.android_client (stdlib urllib).
-# Do not add the desktop openai/httpx/pydantic dependency tree to the APK.
+certifi==2026.7.22
+
+# Android runtime networking uses app.ai.android_client (stdlib urllib)
+# with certifi's Mozilla CA bundle.
+# The desktop openai/httpx/pydantic dependency tree is intentionally
+# not included in the APK.

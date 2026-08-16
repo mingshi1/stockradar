@@ -1,5 +1,5 @@
 #define MyAppName "AI板块事件雷达"
-#define MyAppVersion "1.0.0-rc4.17"
+#define MyAppVersion "1.0.0-rc4.18"
 #define MyAppPublisher "StockEventRadar"
 #define MyAppExeName "StockEventRadar.exe"
 
@@ -13,7 +13,7 @@ DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=output
-OutputBaseFilename=StockEventRadar-Setup-1.0.0-rc4.17
+OutputBaseFilename=StockEventRadar-Setup-1.0.0-rc4.18
 SetupIconFile=..\resources\app_icon.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma2

@@ -103,11 +103,13 @@ jobs:
           import sys
           import PySide6
           import PySide6.QtCore
+          import certifi
 
           print("Python:", sys.version)
           print("PySide6:", PySide6.__version__)
           print("Qt:", PySide6.QtCore.__version__)
           print("PySide6 path:", PySide6.__file__)
+          print("certifi CA:", certifi.where())
           PY
 
       - name: Install pyside6-android-deploy runtime dependencies
@@ -163,6 +165,7 @@ jobs:
 
           assert "python3==3.11.15" in text
           assert "hostpython3==3.11.15" in text
+          assert "certifi==2026.7.22" in text
           assert 'p4a.branch", "v2026.05.09"' in text
 
           print("Qt Android deploy patch verification: OK")
@@ -333,7 +336,7 @@ jobs:
       - name: Upload Android Beta
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Beta-1.0.0-rc4.17
+          name: StockEventRadar-Android-Beta-1.0.0-rc4.18
           if-no-files-found: error
           path: android-output/StockEventRadar-Android-arm64-v8a-debug.apk
 
@@ -341,7 +344,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.17
+          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.18
           if-no-files-found: ignore
           include-hidden-files: true
           path: |
