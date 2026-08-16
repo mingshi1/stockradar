@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.0-rc4.12
+
+### Android single-APK test build
+- Android 构建成功后只保留 1 个 APK。
+- 优先选择包含 `arm64-v8a` + `debug` 的 APK。
+- 最终统一命名：
+  `StockEventRadar-Android-arm64-v8a-debug.apk`
+- GitHub Artifact 不再包含 3 份重复 APK，显著减少下载和手机传输时间。
+- 验证步骤要求 `android-output/` 中恰好只有 1 个 APK。
+- RC4.11 在荣耀手机仍然“无提示直接闪退”。
+- 因为 Python 层启动异常提示也没有出现，下一步改用 Android `adb logcat`
+  获取系统/native/Qt 层真实崩溃原因，不再继续猜测。
+
 ## 1.0.0-rc4.11
 
 ### Android first-launch crash hotfix

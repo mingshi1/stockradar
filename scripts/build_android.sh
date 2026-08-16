@@ -189,7 +189,7 @@ echo
 echo "Android deploy command completed without a detected Buildozer failure."
 
 echo
-echo "Searching for fresh APK/AAB..."
+echo "Searching for fresh Android APK..."
 
 SEARCH_ROOTS=("$PROJECT_ROOT")
 
@@ -205,61 +205,96 @@ if [ -d "$HOME/.pyside6-android-deploy" ]; then
   SEARCH_ROOTS+=("$HOME/.pyside6-android-deploy")
 fi
 
+ALL_APKS="$PROJECT_ROOT/.android-apks-found.txt"
+: > "$ALL_APKS"
+
 for ROOT_DIR in "${SEARCH_ROOTS[@]}"; do
   echo "Scanning: $ROOT_DIR"
 
   find -L "$ROOT_DIR" \
     -type f \
-    \( -iname "*.apk" -o -iname "*.aab" \) \
+    -iname "*.apk" \
     -newer "$MARKER" \
     -print 2>/dev/null \
-    | tee -a "$FOUND_LIST" || true
+    | tee -a "$ALL_APKS" || true
 done
 
-sort -u "$FOUND_LIST" -o "$FOUND_LIST"
+sort -u "$ALL_APKS" -o "$ALL_APKS"
 
-COUNT="$(grep -c . "$FOUND_LIST" || true)"
+TOTAL_APKS="$(grep -c . "$ALL_APKS" || true)"
+echo "Fresh APK count found: $TOTAL_APKS"
 
-echo "Fresh APK/AAB count: $COUNT"
-
-if [ "$COUNT" -eq 0 ]; then
+if [ "$TOTAL_APKS" -eq 0 ]; then
   echo
-  echo "Deploy did not report a failure, but no APK/AAB was found."
+  echo "No fresh APK was found."
   echo "Last 220 lines of android-deploy.log:"
   tail -220 "$DEPLOY_LOG" || true
   exit 21
 fi
 
-INDEX=0
-
-while IFS= read -r ARTIFACT; do
-  [ -n "$ARTIFACT" ] || continue
-
-  BASENAME="$(basename "$ARTIFACT")"
-  DEST="$OUTPUT_DIR/$BASENAME"
-
-  if [ -e "$DEST" ]; then
-    INDEX=$((INDEX + 1))
-    EXT="${BASENAME##*.}"
-    STEM="${BASENAME%.*}"
-    DEST="$OUTPUT_DIR/${STEM}-${INDEX}.${EXT}"
-  fi
-
-  cp -v "$ARTIFACT" "$DEST"
-done < "$FOUND_LIST"
-
 echo
-echo "Normalized Android output:"
-ls -lah "$OUTPUT_DIR"
+echo "APK candidates:"
+cat "$ALL_APKS"
 
-if ! find "$OUTPUT_DIR" \
-  -maxdepth 1 \
-  -type f \
-  \( -iname "*.apk" -o -iname "*.aab" \) \
-  | grep -q .; then
-  echo "Artifact normalization failed."
+# Prefer the architecture-explicit debug APK.
+SELECTED_APK="$(
+  grep -Ei 'arm64[-_]?v8a.*debug\.apk$' "$ALL_APKS" \
+    | head -1 \
+    || true
+)"
+
+# Then prefer any debug APK.
+if [ -z "$SELECTED_APK" ]; then
+  SELECTED_APK="$(
+    grep -Ei 'debug.*\.apk$' "$ALL_APKS" \
+      | head -1 \
+      || true
+  )"
+fi
+
+# Final fallback: first APK.
+if [ -z "$SELECTED_APK" ]; then
+  SELECTED_APK="$(
+    head -1 "$ALL_APKS"
+  )"
+fi
+
+if [ -z "$SELECTED_APK" ] || [ ! -f "$SELECTED_APK" ]; then
+  echo "Unable to choose a valid APK."
   exit 22
 fi
 
+FINAL_APK="$OUTPUT_DIR/StockEventRadar-Android-arm64-v8a-debug.apk"
+
+rm -f "$OUTPUT_DIR"/*.apk
+
 echo
-echo "Android deployment and artifact collection completed successfully."
+echo "Selected APK:"
+echo "  $SELECTED_APK"
+
+cp -v "$SELECTED_APK" "$FINAL_APK"
+
+echo
+echo "Final Android output:"
+ls -lah "$OUTPUT_DIR"
+
+APK_COUNT="$(
+  find "$OUTPUT_DIR" \
+    -maxdepth 1 \
+    -type f \
+    -iname "*.apk" \
+    | wc -l
+)"
+
+if [ "$APK_COUNT" -ne 1 ]; then
+  echo "Expected exactly one APK in android-output, found: $APK_COUNT"
+  exit 23
+fi
+
+test -s "$FINAL_APK"
+
+echo
+echo "Single APK ready:"
+echo "  $FINAL_APK"
+echo
+echo "Android deployment and single-artifact collection completed successfully."

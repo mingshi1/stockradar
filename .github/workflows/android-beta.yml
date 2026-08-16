@@ -305,41 +305,43 @@ jobs:
             "$PWD/android-wheels/${PYSIDE_ANDROID_WHEEL_FILENAME}" \
             "$PWD/android-wheels/${SHIBOKEN_ANDROID_WHEEL_FILENAME}"
 
-      - name: Validate collected APK/AAB
-        shell: bash
-        run: |
-          set -euxo pipefail
+- name: Validate single Android APK
+  shell: bash
+  run: |
+    set -euxo pipefail
 
-          echo "Android output produced by build_android.sh:"
-          ls -lah android-output
+    ls -lah android-output
 
-          find android-output \
-            -maxdepth 1 \
-            -type f \
-            \( -iname "*.apk" -o -iname "*.aab" \) \
-            -print
+    test -s \
+      android-output/StockEventRadar-Android-arm64-v8a-debug.apk
 
-          if ! find android-output \
-            -maxdepth 1 \
-            -type f \
-            \( -iname "*.apk" -o -iname "*.aab" \) \
-            | grep -q .; then
-            echo "No normalized APK/AAB was found in android-output."
-            exit 1
-          fi
+    APK_COUNT="$(
+      find android-output \
+        -maxdepth 1 \
+        -type f \
+        -iname "*.apk" \
+        | wc -l
+    )"
+
+    echo "APK count: $APK_COUNT"
+
+    if [ "$APK_COUNT" -ne 1 ]; then
+      echo "Expected exactly one APK artifact."
+      exit 1
+    fi
 
       - name: Upload Android Beta
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Beta-1.0.0-rc4.11
+          name: StockEventRadar-Android-Beta-1.0.0-rc4.12
           if-no-files-found: error
-          path: android-output/*
+          path: android-output/StockEventRadar-Android-arm64-v8a-debug.apk
 
       - name: Upload Android diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.11
+          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.12
           if-no-files-found: ignore
           include-hidden-files: true
           path: |
@@ -351,6 +353,7 @@ jobs:
             deployment/**
             android-output/**
             android-deploy.log
+            .android-apks-found.txt
             buildozer.spec
             .android-artifacts-found.txt
             .android-build-start

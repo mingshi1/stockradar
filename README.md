@@ -1,4 +1,4 @@
-# AI板块事件雷达 v1.0.0-rc4.11.1
+# AI板块事件雷达 v1.0.0-rc4.12.1
 
 V0.9 的主题是：
 
@@ -175,8 +175,8 @@ Windows 可以：
 或者：
 
 ```text
-git tag v1.0.0-rc4.11.1
-git push origin v1.0.0-rc4.11.1
+git tag v1.0.0-rc4.12.1
+git push origin v1.0.0-rc4.12.1
 ```
 
 触发 Release 构建。
@@ -339,7 +339,7 @@ V1.0 不再大改架构。
 
 ---
 
-# V1.0.0 RC4.11 Hotfix
+# V1.0.0 RC4.12 Hotfix
 
 本修订专门修复两项 V0.9 Windows 测试问题：
 
@@ -376,7 +376,7 @@ Unblock-File .\scripts\build_windows.ps1
 
 ---
 
-# V1.0.0 RC4.11 Windows Build Hotfix
+# V1.0.0 RC4.12 Windows Build Hotfix
 
 如果旧版构建日志出现：
 
@@ -389,7 +389,7 @@ FileNotFoundError:
 
 说明 Nuitka 编译已经成功，失败发生在最终复制阶段。
 
-V1.0.0 RC4.11 会在编译前创建：
+V1.0.0 RC4.12 会在编译前创建：
 
 ```text
 dist\
@@ -413,7 +413,7 @@ dist\StockEventRadar.exe
 
 ---
 
-# V1.0.0 RC4.11：Windows 构建缓存转移到 D 盘
+# V1.0.0 RC4.12：Windows 构建缓存转移到 D 盘
 
 默认大型构建工作区：
 
@@ -455,7 +455,7 @@ D:\coding\stock-event-radar
 
 ---
 
-# V1.0.0 RC4.11：自动任务中心
+# V1.0.0 RC4.12：自动任务中心
 
 本候选版新增：
 
@@ -479,7 +479,7 @@ V1_RC1_TEST_PLAN.md
 
 ---
 
-# V1.0.0 RC4.11
+# V1.0.0 RC4.12
 
 RC3 将邮件/SMTP功能从正式范围中移除，聚焦：
 - 自动定时分析
@@ -498,7 +498,7 @@ RC3 将邮件/SMTP功能从正式范围中移除，聚焦：
 
 ---
 
-# V1.0.0 RC4.11
+# V1.0.0 RC4.12
 
 RC4 重点是发布流水线可靠性：
 
@@ -514,7 +514,7 @@ RC4 重点是发布流水线可靠性：
 
 ---
 
-# V1.0.0 RC4.11
+# V1.0.0 RC4.12
 
 Android CI 继续修复 Qt 官方交叉编译工具依赖：
 
@@ -527,7 +527,7 @@ Android CI 继续修复 Qt 官方交叉编译工具依赖：
 
 ---
 
-# V1.0.0 RC4.11
+# V1.0.0 RC4.12
 
 Android CI 已经进入真正 APK 构建阶段。
 RC4.4 自动安装 PySide6 自带的 Android deploy runtime requirements，
@@ -538,7 +538,7 @@ RC4.4 自动安装 PySide6 自带的 Android deploy runtime requirements，
 
 ---
 
-# V1.0.0 RC4.11
+# V1.0.0 RC4.12
 
 Android deploy 修复项目扫描污染：
 Qt for Python 的 `pyside-setup` 工具源码不再 clone 到应用项目目录，
@@ -549,7 +549,7 @@ Qt for Python 的 `pyside-setup` 工具源码不再 clone 到应用项目目录�
 
 ---
 
-# V1.0.0 RC4.11
+# V1.0.0 RC4.12
 
 Android 编译命令已经成功，RC4.6 修复的是 APK/AAB 产物定位和收集逻辑。
 不再使用 `find . -maxdepth 8`，而是对本次构建新产物进行跨构建目录搜索，
@@ -560,7 +560,7 @@ Android 编译命令已经成功，RC4.6 修复的是 APK/AAB 产物定位和收
 
 ---
 
-# V1.0.0 RC4.11
+# V1.0.0 RC4.12
 
 RC4.6 的 Android 诊断显示 p4a 在 cp311 Qt wheel 下错误选择了 Python 3.14。
 RC4.7 强制 Android target python 与 hostpython 都使用 3.11.15，
@@ -571,7 +571,7 @@ RC4.7 强制 Android target python 与 hostpython 都使用 3.11.15，
 
 ---
 
-# V1.0.0 RC4.11
+# V1.0.0 RC4.12
 
 RC4.7 的 0 秒失败来自我们自己的 wheel 文件名检查，而不是 Qt wheel 错误。
 RC4.8 保留 Qt 官方 wheel 原始文件名，并使用 Python Packaging
@@ -582,7 +582,7 @@ RC4.8 保留 Qt 官方 wheel 原始文件名，并使用 Python Packaging
 
 ---
 
-# V1.0.0 RC4.11
+# V1.0.0 RC4.12
 
 Android CI 不再把 p4a 仓库中的 Python 3.14 补丁文件误判成
 “实际正在构建 Python 3.14”。
@@ -595,7 +595,7 @@ RC4.9 固定 p4a 正式 release、固定 cp311 target/hostpython，
 
 ---
 
-# V1.0.0 RC4.11
+# V1.0.0 RC4.12
 
 Android 完整日志已把真实失败定位到 python-for-android 的 libffi
 autotools 阶段：`LT_SYS_SYMBOL_USCORE` 宏不可用。
@@ -609,7 +609,7 @@ RC4.10 在 Ubuntu Runner 中显式安装完整 native build prerequisites，
 
 ---
 
-# V1.0.0 RC4.11
+# V1.0.0 RC4.12
 
 Android APK 已经成功生成并安装，当前进入实机运行兼容阶段。
 
@@ -617,3 +617,19 @@ RC4.11 去掉 Android 启动时对 desktop `openai` SDK 的硬依赖，
 Android API 请求使用标准库 HTTP client，并加入启动错误可见诊断。
 
 详见 `V1_RC4_11_TEST_PLAN.md`。
+
+
+---
+
+# V1.0.0 RC4.12
+
+Android GitHub Artifact 现在只保留一个：
+
+```text
+StockEventRadar-Android-arm64-v8a-debug.apk
+```
+
+RC4.11 在荣耀手机仍为无提示闪退，因此下一步使用 ADB Logcat
+抓 native/Qt/Android 层真实崩溃日志，不再继续凭现象猜原因。
+
+详见 `V1_RC4_12_TEST_PLAN.md`。

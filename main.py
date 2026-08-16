@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 
-APP_VERSION = "1.0.0-rc4.11"
+APP_VERSION = "1.0.0-rc4.12"
 
 
 def _task_id_from_args() -> int | None:
