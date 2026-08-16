@@ -9,7 +9,7 @@ on:
 env:
   QT_FOR_PYTHON_VERSION: "6.11.1"
   QT_FOR_PYTHON_BRANCH: "6.11"
-  PYSIDE_ANDROID_WHEEL_URL: "https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.11.1-6.11.1-cp311-cp311-android_aarch64.whl"
+  PYSIDE_ANDROID_WHEEL_URL: "https://download.qt.io/official_releases/QtForPython/pyside6/pyside6-6.11.1-6.11.1-cp311-cp311-android_aarch64.whl"
   SHIBOKEN_ANDROID_WHEEL_URL: "https://download.qt.io/official_releases/QtForPython/shiboken6/shiboken6-6.11.1-6.11.1-cp311-cp311-android_aarch64.whl"
 
 jobs:
@@ -28,10 +28,24 @@ jobs:
 
       - name: Install build environment
         run: |
+          set -euxo pipefail
           python -m pip install --upgrade pip
           python -m pip install -r requirements-android.txt
           python -m pip check
           python -c "import PySide6, PySide6.QtCore; print('PySide6', PySide6.__version__); print('Qt', PySide6.QtCore.__version__)"
+
+      - name: Verify official Android wheel URLs
+        shell: bash
+        run: |
+          set -euxo pipefail
+          echo "$PYSIDE_ANDROID_WHEEL_URL"
+          echo "$SHIBOKEN_ANDROID_WHEEL_URL"
+
+          curl --fail --location --retry 3 --head \
+            "$PYSIDE_ANDROID_WHEEL_URL"
+
+          curl --fail --location --retry 3 --head \
+            "$SHIBOKEN_ANDROID_WHEEL_URL"
 
       - name: Download official Android ARM64 wheels
         shell: bash
@@ -41,7 +55,7 @@ jobs:
 
           curl --fail --location --retry 3 \
             "$PYSIDE_ANDROID_WHEEL_URL" \
-            -o "android-wheels/PySide6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
+            -o "android-wheels/pyside6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
 
           curl --fail --location --retry 3 \
             "$SHIBOKEN_ANDROID_WHEEL_URL" \
@@ -49,7 +63,7 @@ jobs:
 
           ls -lh android-wheels
 
-          test -s "android-wheels/PySide6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
+          test -s "android-wheels/pyside6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
           test -s "android-wheels/shiboken6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
 
       - name: Download matching Android SDK and NDK
@@ -74,7 +88,7 @@ jobs:
           chmod +x scripts/build_android.sh
 
           ./scripts/build_android.sh \
-            "$PWD/android-wheels/PySide6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl" \
+            "$PWD/android-wheels/pyside6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl" \
             "$PWD/android-wheels/shiboken6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
 
       - name: Collect APK/AAB
@@ -95,17 +109,17 @@ jobs:
           fi
 
       - name: Upload Android Beta
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Beta-1.0.0-rc4
+          name: StockEventRadar-Android-Beta-1.0.0-rc4.1
           if-no-files-found: error
           path: android-output/*
 
       - name: Upload Android diagnostics on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4
+          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.1
           if-no-files-found: ignore
           path: |
             pysidedeploy.spec

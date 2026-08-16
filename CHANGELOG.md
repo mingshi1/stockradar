@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.0-rc4.1
+
+### Android hotfix
+- 修复 PySide6 Android 官方 wheel 文件名大小写：`PySide6-...whl` → `pyside6-...whl`。
+- 增加官方 wheel URL HEAD 预检，下载失败时能直接看到 HTTP 错误。
+- `actions/upload-artifact` 更新到 v6（Node.js 24）。
+- Android Artifact 名更新为 `StockEventRadar-Android-Beta-1.0.0-rc4.1`。
+
 ## 1.0.0-rc4
 
 ### Windows CI
