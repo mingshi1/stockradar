@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import QUrl, Qt
+from PySide6.QtCore import QTimer, QUrl, Qt
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
@@ -127,7 +127,33 @@ class MainWindow(QMainWindow):
         self.refresh_database_views()
 
         self._ui_ready = True
-        self._apply_responsive_layout()
+        self._responsive_mobile_state = None
+
+        # Do not use QWidget.resizeEvent as a Python virtual override.
+        # Android logcat showed Shiboken crashing in the virtual
+        # override error path during geometry changes.
+        self._responsive_timer = QTimer(
+            self
+        )
+        self._responsive_timer.setInterval(
+            350
+        )
+        self._responsive_timer.timeout.connect(
+            self._poll_responsive_layout
+        )
+
+        if is_android():
+            # Set the obvious visibility defaults immediately, using
+            # normal method calls rather than an event override.
+            self.sidebar.setVisible(
+                False
+            )
+            self.mobile_nav.setVisible(
+                True
+            )
+        else:
+            self._apply_responsive_layout()
+            self._responsive_timer.start()
 
     # =========================================================
     # UI
@@ -539,26 +565,25 @@ class MainWindow(QMainWindow):
         if index == 8:
             self.refresh_system_info()
 
-    def resizeEvent(
+    def _desired_mobile_layout(
         self,
-        event,
+    ) -> bool:
+        mode = self.config.ui_mode
+
+        if mode == "desktop":
+            return False
+
+        if mode == "mobile":
+            return True
+
+        if is_android():
+            return True
+
+        return self.width() < 900
+
+    def _poll_responsive_layout(
+        self,
     ):
-        """
-        Keep Python exceptions from escaping a Qt virtual override.
-
-        RC4.15 logcat showed a Shiboken native crash while handling
-        a Python QWidget event during an Android geometry change.
-        """
-        try:
-            super().resizeEvent(
-                event
-            )
-        except Exception:
-            self.logger.exception(
-                "Base resizeEvent failed"
-            )
-            return
-
         if not getattr(
             self,
             "_ui_ready",
@@ -566,11 +591,33 @@ class MainWindow(QMainWindow):
         ):
             return
 
+        desired = (
+            self._desired_mobile_layout()
+        )
+
+        if (
+            desired
+            != self._responsive_mobile_state
+        ):
+            self._apply_responsive_layout()
+
+    def apply_android_layout_after_show(
+        self,
+    ):
+        """
+        Android-safe post-show layout pass.
+
+        This is a regular Python slot/method invoked by QTimer, not a
+        QWidget virtual event handler.
+        """
+        if not is_android():
+            return
+
         try:
             self._apply_responsive_layout()
         except Exception:
             self.logger.exception(
-                "Responsive layout failed during resizeEvent"
+                "Android post-show layout failed"
             )
 
     def _apply_responsive_layout(
@@ -583,14 +630,12 @@ class MainWindow(QMainWindow):
         ):
             return
 
-        mode = self.config.ui_mode
-
-        if mode == "desktop":
-            mobile = False
-        elif mode == "mobile":
-            mobile = True
-        else:
-            mobile = self.width() < 900
+        mobile = (
+            self._desired_mobile_layout()
+        )
+        self._responsive_mobile_state = (
+            mobile
+        )
 
         self.sidebar.setVisible(
             not mobile

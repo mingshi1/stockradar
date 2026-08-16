@@ -5,7 +5,7 @@ import sys
 import traceback
 from pathlib import Path
 
-from PySide6.QtCore import QStandardPaths
+from PySide6.QtCore import QStandardPaths, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QApplication,
@@ -13,7 +13,50 @@ from PySide6.QtWidgets import (
 )
 
 
-APP_VERSION = "1.0.0-rc4.16"
+APP_VERSION = "1.0.0-rc4.17"
+
+
+def _stage(
+    message: str,
+):
+    line = (
+        f"[StockEventRadar] {message}"
+    )
+
+    print(
+        line,
+        flush=True,
+    )
+
+    try:
+        location = (
+            QStandardPaths.writableLocation(
+                QStandardPaths.StandardLocation.AppDataLocation
+            )
+        )
+
+        if location:
+            root = Path(
+                location
+            )
+            root.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+
+            with (
+                root
+                / "startup_stage.log"
+            ).open(
+                "a",
+                encoding="utf-8",
+            ) as fp:
+                fp.write(
+                    line + "\n"
+                )
+    except Exception:
+        pass
+
 
 
 def _task_id_from_args() -> int | None:
@@ -227,9 +270,9 @@ def _run_gui() -> int:
 
     setup_logging()
 
-    print(
-        "Runtime platform:",
-        runtime_platform_info(),
+    _stage(
+        "Runtime platform: "
+        f"{runtime_platform_info()}"
     )
 
     app = (
@@ -261,7 +304,9 @@ def _run_gui() -> int:
             )
             wizard.exec()
 
-    print("MainWindow stage: constructing")
+    _stage(
+        "MainWindow stage: constructing"
+    )
 
     window = MainWindow(
         config=config,
@@ -270,9 +315,41 @@ def _run_gui() -> int:
         ),
     )
 
-    print("MainWindow stage: constructed")
-    window.show()
-    print("MainWindow stage: shown")
+    _stage(
+        "MainWindow stage: constructed"
+    )
+
+    if is_android():
+        def show_mobile_window():
+            _stage(
+                "MainWindow stage: showing"
+            )
+
+            window.show()
+
+            _stage(
+                "MainWindow stage: shown"
+            )
+
+            # Let the native Android window establish its geometry
+            # before the mobile page-margin/layout pass.
+            QTimer.singleShot(
+                120,
+                window.apply_android_layout_after_show,
+            )
+
+        # Start the Qt application event loop first.  This avoids a
+        # synchronous top-level QWidget.show() while the previous
+        # onboarding dialog/native geometry transition is unwinding.
+        QTimer.singleShot(
+            0,
+            show_mobile_window,
+        )
+    else:
+        window.show()
+        _stage(
+            "MainWindow stage: shown"
+        )
 
     return app.exec()
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.0.0-rc4.17
+
+### Android Shiboken virtual-override stability pass
+- RC4.16 荣耀真机仍发生相同 native SIGSEGV。
+- ADB backtrace 继续指向：
+  `libshiboken6 -> storePythonOverrideErrorOrPrint -> QWidget::event`
+  并伴随 Android geometry change / QWidget visibility。
+- RC4.17 不再只保护 resizeEvent，而是从 Android 运行路径移除
+  自定义 QWidget 虚函数 override：
+  - MainWindow 完全移除 Python `resizeEvent()`
+  - Desktop 响应式布局改用 QTimer 宽度轮询
+  - Android 只在窗口显示后做一次普通方法的移动布局
+  - Android TrendChart 改为 QLabel 文本趋势，不再覆写 `paintEvent()`
+  - MobileFirstRunDialog 不再覆写 `QDialog.accept()`
+- Android MainWindow `show()` 改为 Qt 主事件循环启动后通过 QTimer 调度。
+- 移动布局在 native window 建立后延迟 120ms 应用。
+- 启动阶段日志改成 `flush=True`，并同步写
+  `startup_stage.log`，下次即使 native crash 也能看到准确阶段。
+- 继续只上传一个 APK：
+  `StockEventRadar-Android-arm64-v8a-debug.apk`。
+
 ## 1.0.0-rc4.16
 
 ### Android MainWindow native crash fix

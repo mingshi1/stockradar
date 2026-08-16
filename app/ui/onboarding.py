@@ -418,13 +418,13 @@ class MobileFirstRunDialog(QDialog):
             44
         )
         self.enter_button.clicked.connect(
-            self.accept
+            self._finish_setup
         )
         root.addWidget(
             self.enter_button
         )
 
-    def accept(self):
+    def _finish_setup(self):
         provider = (
             self.provider_combo
             .currentText()
@@ -452,4 +452,8 @@ class MobileFirstRunDialog(QDialog):
         self.config.onboarding_complete = True
         self.config.save()
 
-        super().accept()
+        # Explicit C++ base call, without overriding QDialog.accept
+        # in the Android dialog class.
+        QDialog.accept(
+            self
+        )
