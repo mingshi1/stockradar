@@ -82,14 +82,12 @@ jobs:
           echo "$ANDROID_REQ"
 
           test -f "$ANDROID_REQ"
-          cat "$ANDROID_REQ"
-
           python -m pip install -r "$ANDROID_REQ"
           python -m pip check
 
           python - <<'PY'
           import pkginfo
-          print("pkginfo:", getattr(pkginfo, "__version__", "installed"))
+          print("pkginfo installed")
           PY
 
       - name: Verify official Android wheel URLs
@@ -123,28 +121,48 @@ jobs:
           test -s "android-wheels/pyside6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
           test -s "android-wheels/shiboken6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
 
-      - name: Clone matching Qt for Python tools
+      - name: Clone matching Qt for Python tools outside app project
         shell: bash
         run: |
           set -euxo pipefail
 
-          git clone --depth 1 --branch "$QT_FOR_PYTHON_BRANCH" \
-            https://code.qt.io/pyside/pyside-setup
+          QT_TOOLS_DIR="$RUNNER_TEMP/pyside-setup"
+          rm -rf "$QT_TOOLS_DIR"
 
-          test -f pyside-setup/requirements.txt
-          test -f pyside-setup/tools/cross_compile_android/requirements.txt
-          test -f pyside-setup/tools/cross_compile_android/main.py
+          git clone \
+            --depth 1 \
+            --branch "$QT_FOR_PYTHON_BRANCH" \
+            https://code.qt.io/pyside/pyside-setup \
+            "$QT_TOOLS_DIR"
+
+          test -f "$QT_TOOLS_DIR/requirements.txt"
+          test -f "$QT_TOOLS_DIR/tools/cross_compile_android/requirements.txt"
+          test -f "$QT_TOOLS_DIR/tools/cross_compile_android/main.py"
+
+          echo "Qt tools are outside the application project:"
+          echo "  $QT_TOOLS_DIR"
+          echo "Application project:"
+          echo "  $GITHUB_WORKSPACE"
+
+          case "$QT_TOOLS_DIR" in
+            "$GITHUB_WORKSPACE"/*)
+              echo "ERROR: Qt tools were cloned inside the app project."
+              exit 1
+              ;;
+          esac
 
       - name: Install Qt for Python tool dependencies
         shell: bash
         run: |
           set -euxo pipefail
 
-          python -m pip install \
-            -r pyside-setup/requirements.txt
+          QT_TOOLS_DIR="$RUNNER_TEMP/pyside-setup"
 
           python -m pip install \
-            -r pyside-setup/tools/cross_compile_android/requirements.txt
+            -r "$QT_TOOLS_DIR/requirements.txt"
+
+          python -m pip install \
+            -r "$QT_TOOLS_DIR/tools/cross_compile_android/requirements.txt"
 
           python -m pip check
 
@@ -156,9 +174,9 @@ jobs:
 
           print("GitPython:", git.__version__)
           print("packaging:", packaging.__version__)
-          print("pkginfo:", getattr(pkginfo, "__version__", "installed"))
+          print("pkginfo installed")
           print(
-              "packaging.version.Version OK:",
+              "Version parser:",
               packaging.version.Version("6.11.1"),
           )
           PY
@@ -168,7 +186,9 @@ jobs:
         run: |
           set -euxo pipefail
 
-          python pyside-setup/tools/cross_compile_android/main.py \
+          QT_TOOLS_DIR="$RUNNER_TEMP/pyside-setup"
+
+          python "$QT_TOOLS_DIR/tools/cross_compile_android/main.py" \
             --download-only \
             --skip-update \
             --auto-accept-license
@@ -178,6 +198,23 @@ jobs:
             -maxdepth 4 \
             -type d \
             -print || true
+
+      - name: Verify app project is clean before deploy
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          if [ -d "$GITHUB_WORKSPACE/pyside-setup" ]; then
+            echo "ERROR: pyside-setup must not exist inside application project."
+            exit 1
+          fi
+
+          echo "Top-level application project:"
+          find "$GITHUB_WORKSPACE" \
+            -maxdepth 1 \
+            -mindepth 1 \
+            -printf "%f\n" \
+            | sort
 
       - name: Build Android APK Beta
         shell: bash
@@ -197,7 +234,9 @@ jobs:
 
           mkdir -p android-output
 
-          find . -maxdepth 8 \( -name "*.apk" -o -name "*.aab" \) \
+          find . \
+            -maxdepth 8 \
+            \( -name "*.apk" -o -name "*.aab" \) \
             -not -path "./android-output/*" \
             -exec cp -v {} android-output/ \;
 
@@ -214,7 +253,7 @@ jobs:
       - name: Upload Android Beta
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Beta-1.0.0-rc4.4
+          name: StockEventRadar-Android-Beta-1.0.0-rc4.5
           if-no-files-found: error
           path: android-output/*
 
@@ -222,11 +261,11 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.4
+          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.5
           if-no-files-found: ignore
           include-hidden-files: true
           path: |
             pysidedeploy.spec
             .buildozer/**
             deployment/**
-            pyside-setup/tools/cross_compile_android/**
+            android-output/**

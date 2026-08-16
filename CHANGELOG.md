@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.0-rc4.5
+
+### Android deploy project-scan fix
+- RC4.4 已成功进入 `pyside6-android-deploy` 的模块扫描阶段。
+- 修复 Qt for Python `pyside-setup` 源码被 clone 到应用项目根目录，
+  导致 deploy 把 Qt 自己的 `__init__.tmpl.py` 当成应用源码解析的问题。
+- Qt tools 现在 clone 到 GitHub Runner 临时目录：
+  `$RUNNER_TEMP/pyside-setup`。
+- SDK/NDK 下载脚本从临时 Qt tools 目录运行。
+- 构建前显式检查应用项目中不存在 `pyside-setup`。
+- `pyside6-android-deploy` 新增 `--extra-ignore-dirs`，
+  排除 android-wheels、android-output、deployment、dist、installer、
+  .git、.github 等非应用目录。
+- Android Artifact 更新为
+  `StockEventRadar-Android-Beta-1.0.0-rc4.5`。
+
 ## 1.0.0-rc4.4
 
 ### Android CI hotfix
