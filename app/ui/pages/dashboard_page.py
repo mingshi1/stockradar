@@ -1,4 +1,6 @@
 from PySide6.QtCore import Qt, Signal
+
+from app.platform import is_android
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -45,8 +47,15 @@ class DashboardPage(QWidget):
 
     def _build_ui(self):
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(45, 25, 45, 25)
-        main_layout.setSpacing(12)
+        main_layout.setContentsMargins(
+            14 if is_android() else 45,
+            12 if is_android() else 25,
+            14 if is_android() else 45,
+            18 if is_android() else 25,
+        )
+        main_layout.setSpacing(
+            10 if is_android() else 12
+        )
 
         title = QLabel("今日板块事件分析")
         title.setObjectName("pageTitle")
@@ -55,6 +64,7 @@ class DashboardPage(QWidget):
             "V1.0 会实时显示联网研究、每个模型、共识计算和 Judge 的实际任务状态。"
         )
         description.setObjectName("pageDescription")
+        description.setWordWrap(True)
 
         main_layout.addWidget(title)
         main_layout.addWidget(description)
@@ -77,7 +87,11 @@ class DashboardPage(QWidget):
         self.sector_layout.addLayout(self.checkbox_container)
         self._rebuild_checkboxes()
 
-        custom_row = QHBoxLayout()
+        custom_row = (
+            QVBoxLayout()
+            if is_android()
+            else QHBoxLayout()
+        )
 
         self.custom_sector_input = QLineEdit()
         self.custom_sector_input.setPlaceholderText(
@@ -105,18 +119,32 @@ class DashboardPage(QWidget):
         # =====================================================
         # Start row
         # =====================================================
-        button_row = QHBoxLayout()
+        button_row = (
+            QVBoxLayout()
+            if is_android()
+            else QHBoxLayout()
+        )
 
         self.status_label = QLabel("等待开始分析")
         self.status_label.setObjectName("statusLabel")
         button_row.addWidget(self.status_label)
 
-        button_row.addStretch()
+        if not is_android():
+            button_row.addStretch()
 
         self.analyze_button = QPushButton("开始分析")
         self.analyze_button.setObjectName("primaryButton")
-        self.analyze_button.setFixedWidth(180)
-        self.analyze_button.setFixedHeight(42)
+        if is_android():
+            self.analyze_button.setMinimumHeight(
+                44
+            )
+        else:
+            self.analyze_button.setFixedWidth(
+                180
+            )
+            self.analyze_button.setFixedHeight(
+                42
+            )
         self.analyze_button.clicked.connect(
             self._emit_analysis_request
         )
@@ -179,22 +207,54 @@ class DashboardPage(QWidget):
         self.progress_table.setSelectionMode(
             QAbstractItemView.SelectionMode.NoSelection
         )
-        self.progress_table.setMaximumHeight(170)
+        self.progress_table.setMaximumHeight(
+            220 if is_android() else 170
+        )
+
+        if is_android():
+            # Mobile intentionally omits Token/cost columns.
+            self.progress_table.setColumnHidden(
+                4,
+                True,
+            )
+            self.progress_table.setColumnHidden(
+                5,
+                True,
+            )
 
         header = self.progress_table.horizontalHeader()
-        header.setSectionResizeMode(
-            0,
-            QHeaderView.ResizeMode.ResizeToContents,
-        )
-        header.setSectionResizeMode(
-            1,
-            QHeaderView.ResizeMode.Stretch,
-        )
-        for column in range(2, 6):
+
+        if is_android():
             header.setSectionResizeMode(
-                column,
+                0,
                 QHeaderView.ResizeMode.ResizeToContents,
             )
+            header.setSectionResizeMode(
+                1,
+                QHeaderView.ResizeMode.Stretch,
+            )
+            header.setSectionResizeMode(
+                2,
+                QHeaderView.ResizeMode.ResizeToContents,
+            )
+            header.setSectionResizeMode(
+                3,
+                QHeaderView.ResizeMode.ResizeToContents,
+            )
+        else:
+            header.setSectionResizeMode(
+                0,
+                QHeaderView.ResizeMode.ResizeToContents,
+            )
+            header.setSectionResizeMode(
+                1,
+                QHeaderView.ResizeMode.Stretch,
+            )
+            for column in range(2, 6):
+                header.setSectionResizeMode(
+                    column,
+                    QHeaderView.ResizeMode.ResizeToContents,
+                )
 
         monitor_layout.addWidget(self.progress_table)
 
@@ -202,7 +262,10 @@ class DashboardPage(QWidget):
             "* 成本只在“AI 设置”填写每百万 Token 单价后估算；未配置时显示 —。"
         )
         cost_hint.setObjectName("statusLabel")
-        monitor_layout.addWidget(cost_hint)
+        if not is_android():
+            monitor_layout.addWidget(
+                cost_hint
+            )
 
         main_layout.addWidget(monitor_card)
 
@@ -221,12 +284,39 @@ class DashboardPage(QWidget):
 
         self.result_browser = QTextBrowser()
         self.result_browser.setOpenExternalLinks(True)
+
+        if is_android():
+            self.result_browser.setMinimumHeight(
+                300
+            )
         self.result_browser.setPlaceholderText(
             "分析完成后，Multi-AI 共识结果将显示在这里。"
         )
         result_layout.addWidget(self.result_browser)
 
-        main_layout.addWidget(result_card, 1)
+        main_layout.addWidget(
+            result_card,
+            0 if is_android() else 1,
+        )
+
+    def set_mobile_mode(
+        self,
+        enabled: bool,
+    ):
+        if not enabled:
+            return
+
+        self.progress_table.setColumnHidden(
+            4,
+            True,
+        )
+        self.progress_table.setColumnHidden(
+            5,
+            True,
+        )
+        self.result_browser.setMinimumHeight(
+            300
+        )
 
     # =========================================================
     # Sector management

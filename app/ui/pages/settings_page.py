@@ -842,8 +842,9 @@ class SettingsPage(QWidget):
             return
 
         label.setText(
-            "Key检测："
-            + diag.compact()
+            "Key 已读取："
+            f"{diag.length} 字符 · "
+            f"末尾 {diag.last4}"
         )
         label.setVisible(
             True
@@ -881,7 +882,9 @@ class SettingsPage(QWidget):
         )
 
         label.setText(
-            f"{stage}：{diag.compact()}"
+            f"{stage}："
+            f"{diag.length} 字符 · "
+            f"末尾 {diag.last4}"
         )
         label.setVisible(
             True

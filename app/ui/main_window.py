@@ -41,6 +41,10 @@ from app.ui.pages.settings_page import SettingsPage
 from app.ui.pages.stats_page import StatsPage
 from app.ui.pages.system_page import SystemPage
 from app.ui.onboarding import FirstRunWizard
+from app.ui.mobile_scroll import (
+    enable_touch_scrolling,
+    wrap_mobile_page,
+)
 from app.ui.styles import get_app_style
 from app.platform import is_android
 from app.ai.key_utils import key_diagnostic, normalize_api_key
@@ -227,7 +231,7 @@ class MainWindow(QMainWindow):
         )
         self.system_page = SystemPage()
 
-        for page in [
+        page_objects = [
             self.dashboard_page,
             self.history_page,
             self.sector_page,
@@ -237,9 +241,31 @@ class MainWindow(QMainWindow):
             self.automation_page,
             self.settings_page,
             self.system_page,
-        ]:
+        ]
+
+        self._page_containers = []
+
+        for page in page_objects:
+            if (
+                is_android()
+                and page is not self.automation_page
+            ):
+                container = wrap_mobile_page(
+                    page
+                )
+            else:
+                container = page
+
+            self._page_containers.append(
+                container
+            )
             self.pages.addWidget(
-                page
+                container
+            )
+
+        if is_android():
+            enable_touch_scrolling(
+                self.pages
             )
 
         content_layout.addWidget(
@@ -430,7 +456,7 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         version = QLabel(
-            "v1.0.0 RC4.20"
+            "v1.0.0 RC4.21"
         )
         version.setObjectName(
             "versionLabel"
@@ -616,6 +642,9 @@ class MainWindow(QMainWindow):
 
         try:
             self._apply_responsive_layout()
+            enable_touch_scrolling(
+                self
+            )
         except Exception:
             self.logger.exception(
                 "Android post-show layout failed"
@@ -670,13 +699,22 @@ class MainWindow(QMainWindow):
                         9
                     )
 
-            if hasattr(
+            for responsive_page in (
+                self.dashboard_page,
                 self.history_page,
-                "set_mobile_mode",
+                self.report_page,
             ):
-                self.history_page.set_mobile_mode(
-                    True
-                )
+                if hasattr(
+                    responsive_page,
+                    "set_mobile_mode",
+                ):
+                    responsive_page.set_mobile_mode(
+                        True
+                    )
+
+            enable_touch_scrolling(
+                self
+            )
 
     def change_ui_mode(
         self,

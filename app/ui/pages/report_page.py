@@ -2,6 +2,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -10,6 +11,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from app.platform import is_android
 
 
 class ReportPage(QWidget):
@@ -28,10 +31,10 @@ class ReportPage(QWidget):
     def _build_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(
-            40,
-            25,
-            40,
-            25,
+            14 if is_android() else 40,
+            12 if is_android() else 25,
+            14 if is_android() else 40,
+            18 if is_android() else 25,
         )
         layout.setSpacing(12)
 
@@ -43,7 +46,9 @@ class ReportPage(QWidget):
         )
 
         description = QLabel(
-            "当前版本 生成预览时会自动归档到 SQLite；同一分析记录 + 同一报告类型会更新，不会无限重复。"
+            "生成预览时会自动归档到 SQLite；"
+            "同一分析记录 + 同一报告类型会更新，"
+            "不会无限重复。"
         )
         description.setWordWrap(True)
         description.setObjectName(
@@ -54,18 +59,22 @@ class ReportPage(QWidget):
         layout.addWidget(description)
 
         control_card = QFrame()
-        control_card.setObjectName("card")
+        control_card.setObjectName(
+            "card"
+        )
 
         control_layout = QVBoxLayout(
             control_card
         )
         control_layout.setContentsMargins(
-            22,
-            15,
-            22,
-            15,
+            14 if is_android() else 22,
+            14 if is_android() else 15,
+            14 if is_android() else 22,
+            14 if is_android() else 15,
         )
-        control_layout.setSpacing(10)
+        control_layout.setSpacing(
+            10
+        )
 
         control_title = QLabel(
             "生成报告"
@@ -77,21 +86,7 @@ class ReportPage(QWidget):
             control_title
         )
 
-        first_row = QHBoxLayout()
-
-        first_row.addWidget(
-            QLabel("分析记录")
-        )
-
         self.run_combo = QComboBox()
-        first_row.addWidget(
-            self.run_combo,
-            2,
-        )
-
-        first_row.addWidget(
-            QLabel("报告类型")
-        )
 
         self.type_combo = QComboBox()
         self.type_combo.addItem(
@@ -110,91 +105,184 @@ class ReportPage(QWidget):
             "深度研究报告",
             "deep",
         )
-        first_row.addWidget(
-            self.type_combo,
-            1,
-        )
 
-        generate_button = QPushButton(
+        self.generate_button = QPushButton(
             "生成并归档"
         )
-        generate_button.setObjectName(
+        self.generate_button.setObjectName(
             "primaryButton"
         )
-        generate_button.clicked.connect(
+        self.generate_button.clicked.connect(
             self._generate
-        )
-        first_row.addWidget(
-            generate_button
-        )
-
-        control_layout.addLayout(
-            first_row
-        )
-
-        second_row = QHBoxLayout()
-
-        second_row.addWidget(
-            QLabel("已归档")
         )
 
         self.archive_combo = QComboBox()
-        second_row.addWidget(
-            self.archive_combo,
-            2,
-        )
 
-        open_archive_button = QPushButton(
+        self.open_archive_button = QPushButton(
             "打开归档"
         )
-        open_archive_button.setObjectName(
+        self.open_archive_button.setObjectName(
             "secondaryButton"
         )
-        open_archive_button.clicked.connect(
+        self.open_archive_button.clicked.connect(
             self._open_archive
         )
-        second_row.addWidget(
-            open_archive_button
-        )
 
-        second_row.addStretch()
-
-        copy_button = QPushButton(
+        self.copy_button = QPushButton(
             "复制摘要"
         )
-        copy_button.setObjectName(
+        self.copy_button.setObjectName(
             "secondaryButton"
         )
-        copy_button.clicked.connect(
+        self.copy_button.clicked.connect(
             self.copy_requested.emit
         )
-        second_row.addWidget(
-            copy_button
-        )
 
-        for text, fmt in [
-            ("Markdown", "markdown"),
-            ("HTML", "html"),
-            ("PDF", "pdf"),
-            ("PNG长图", "png"),
-        ]:
-            button = QPushButton(text)
-            button.setObjectName(
-                "secondaryButton"
+        if is_android():
+            control_layout.addWidget(
+                QLabel("分析记录")
             )
-            button.clicked.connect(
-                lambda checked=False,
-                f=fmt:
-                self.export_requested.emit(f)
+            control_layout.addWidget(
+                self.run_combo
             )
-            second_row.addWidget(button)
+            control_layout.addWidget(
+                QLabel("报告类型")
+            )
+            control_layout.addWidget(
+                self.type_combo
+            )
+            self.generate_button.setMinimumHeight(
+                44
+            )
+            control_layout.addWidget(
+                self.generate_button
+            )
 
-        control_layout.addLayout(
-            second_row
-        )
+            archive_title = QLabel(
+                "已归档报告"
+            )
+            archive_title.setObjectName(
+                "cardTitle"
+            )
+            control_layout.addWidget(
+                archive_title
+            )
+            control_layout.addWidget(
+                self.archive_combo
+            )
+            control_layout.addWidget(
+                self.open_archive_button
+            )
+            control_layout.addWidget(
+                self.copy_button
+            )
+
+            export_grid = QGridLayout()
+            export_grid.setSpacing(8)
+
+            for index, (
+                text,
+                fmt,
+            ) in enumerate([
+                ("Markdown", "markdown"),
+                ("HTML", "html"),
+                ("PDF", "pdf"),
+                ("PNG长图", "png"),
+            ]):
+                button = QPushButton(
+                    text
+                )
+                button.setObjectName(
+                    "secondaryButton"
+                )
+                button.clicked.connect(
+                    lambda checked=False,
+                    f=fmt:
+                    self.export_requested.emit(f)
+                )
+                export_grid.addWidget(
+                    button,
+                    index // 2,
+                    index % 2,
+                )
+
+            control_layout.addLayout(
+                export_grid
+            )
+
+        else:
+            first_row = QHBoxLayout()
+
+            first_row.addWidget(
+                QLabel("分析记录")
+            )
+            first_row.addWidget(
+                self.run_combo,
+                2,
+            )
+            first_row.addWidget(
+                QLabel("报告类型")
+            )
+            first_row.addWidget(
+                self.type_combo,
+                1,
+            )
+            first_row.addWidget(
+                self.generate_button
+            )
+
+            control_layout.addLayout(
+                first_row
+            )
+
+            second_row = QHBoxLayout()
+
+            second_row.addWidget(
+                QLabel("已归档")
+            )
+            second_row.addWidget(
+                self.archive_combo,
+                2,
+            )
+            second_row.addWidget(
+                self.open_archive_button
+            )
+            second_row.addStretch()
+            second_row.addWidget(
+                self.copy_button
+            )
+
+            for text, fmt in [
+                ("Markdown", "markdown"),
+                ("HTML", "html"),
+                ("PDF", "pdf"),
+                ("PNG长图", "png"),
+            ]:
+                button = QPushButton(
+                    text
+                )
+                button.setObjectName(
+                    "secondaryButton"
+                )
+                button.clicked.connect(
+                    lambda checked=False,
+                    f=fmt:
+                    self.export_requested.emit(f)
+                )
+                second_row.addWidget(
+                    button
+                )
+
+            control_layout.addLayout(
+                second_row
+            )
 
         hint = QLabel(
-            "30秒晨报和报告归档均基于已有分析结果本地生成，不额外调用 AI。"
+            "30秒晨报和报告归档均基于已有分析结果"
+            "本地生成，不额外调用 AI。"
+        )
+        hint.setWordWrap(
+            True
         )
         hint.setObjectName(
             "statusLabel"
@@ -216,9 +304,9 @@ class ReportPage(QWidget):
             preview_card
         )
         preview_layout.setContentsMargins(
-            20,
+            14 if is_android() else 20,
             14,
-            20,
+            14 if is_android() else 20,
             14,
         )
 
@@ -237,15 +325,33 @@ class ReportPage(QWidget):
             True
         )
         self.browser.setPlaceholderText(
-            "选择历史分析后点击“生成并归档”，或打开已有归档。"
+            "选择历史分析后点击“生成并归档”，"
+            "或打开已有归档。"
         )
+
+        if is_android():
+            self.browser.setMinimumHeight(
+                360
+            )
+
         preview_layout.addWidget(
             self.browser
         )
 
         layout.addWidget(
             preview_card,
-            1,
+            0 if is_android() else 1,
+        )
+
+    def set_mobile_mode(
+        self,
+        enabled: bool,
+    ):
+        if not enabled:
+            return
+
+        self.browser.setMinimumHeight(
+            360
         )
 
     def set_runs(
@@ -380,8 +486,7 @@ class ReportPage(QWidget):
 
     def _open_archive(self):
         report_id = (
-            self.archive_combo
-            .currentData()
+            self.archive_combo.currentData()
         )
 
         if report_id is None:

@@ -28,6 +28,7 @@ class DeepSeekProvider(AIProvider):
         client = self.build_client(
             api_key=api_key,
             base_url=base_url,
+            timeout=180.0,
         )
 
         try:

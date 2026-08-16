@@ -1,14 +1,20 @@
 from __future__ import annotations
 
+import http.client
 import json
 import logging
+import socket
 import ssl
+import time
 import urllib.error
 import urllib.request
 from types import SimpleNamespace
 from typing import Any
 
-from app.ai.key_utils import key_diagnostic, normalize_api_key
+from app.ai.key_utils import (
+    key_diagnostic,
+    normalize_api_key,
+)
 
 
 def _to_namespace(value: Any):
@@ -117,12 +123,6 @@ def _extract_output_text(
 
 
 def _build_ssl_context() -> ssl.SSLContext:
-    """
-    Android's embedded CPython/OpenSSL does not reliably inherit the
-    Android system CA store.  Use certifi's Mozilla CA bundle explicitly.
-
-    Certificate verification and hostname checking remain ENABLED.
-    """
     try:
         import certifi
     except Exception as exc:
@@ -130,10 +130,8 @@ def _build_ssl_context() -> ssl.SSLContext:
             "Android HTTPS 证书库未打包（certifi 缺失）。"
         ) from exc
 
-    ca_file = certifi.where()
-
     context = ssl.create_default_context(
-        cafile=ca_file
+        cafile=certifi.where()
     )
 
     context.check_hostname = True
@@ -151,6 +149,27 @@ def _build_ssl_context() -> ssl.SSLContext:
     return context
 
 
+def _decode_json_bytes(
+    raw: bytes,
+) -> dict:
+    data = json.loads(
+        raw.decode(
+            "utf-8",
+            errors="strict",
+        )
+    )
+
+    if not isinstance(
+        data,
+        dict,
+    ):
+        raise RuntimeError(
+            "API 返回 JSON 顶层不是对象。"
+        )
+
+    return data
+
+
 class _HttpTransport:
     def __init__(
         self,
@@ -165,7 +184,12 @@ class _HttpTransport:
         self.base_url = (
             base_url.rstrip("/")
         )
-
+        self.timeout = float(
+            timeout
+        )
+        self.ssl_context = (
+            _build_ssl_context()
+        )
         self.logger = logging.getLogger(
             "StockEventRadar"
         )
@@ -174,16 +198,80 @@ class _HttpTransport:
             self.api_key
         )
         self.logger.info(
-            "Android HTTP Key diagnostic: "
-            "%s",
+            "Android HTTP Key diagnostic: %s",
             diag.compact(),
         )
-        self.timeout = float(
-            timeout
+
+    def _request_once(
+        self,
+        *,
+        url: str,
+        body: bytes,
+    ) -> bytes:
+        request = urllib.request.Request(
+            url,
+            data=body,
+            method="POST",
+            headers={
+                "Authorization": (
+                    f"Bearer {self.api_key}"
+                ),
+                "Content-Type": (
+                    "application/json"
+                ),
+                "Accept": (
+                    "application/json"
+                ),
+                # Avoid compressed/chunk-reuse edge cases in the
+                # embedded Android urllib/http.client stack.
+                "Accept-Encoding": (
+                    "identity"
+                ),
+                "Connection": (
+                    "close"
+                ),
+                "User-Agent": (
+                    "StockEventRadar-Android/1.0"
+                ),
+            },
         )
-        self.ssl_context = (
-            _build_ssl_context()
-        )
+
+        with urllib.request.urlopen(
+            request,
+            timeout=self.timeout,
+            context=self.ssl_context,
+        ) as response:
+            try:
+                return response.read()
+
+            except http.client.IncompleteRead as exc:
+                partial = (
+                    exc.partial
+                    if isinstance(
+                        exc.partial,
+                        bytes,
+                    )
+                    else b""
+                )
+
+                # Some servers close after the complete JSON body but
+                # before http.client receives the advertised byte count.
+                # If the partial payload is already valid JSON, use it.
+                if partial:
+                    try:
+                        _decode_json_bytes(
+                            partial
+                        )
+                        self.logger.warning(
+                            "Android HTTP recovered complete "
+                            "JSON from IncompleteRead partial=%s",
+                            len(partial),
+                        )
+                        return partial
+                    except Exception:
+                        pass
+
+                raise
 
     def post(
         self,
@@ -202,118 +290,148 @@ class _HttpTransport:
             "utf-8"
         )
 
-        request = urllib.request.Request(
-            url,
-            data=body,
-            method="POST",
-            headers={
-                "Authorization": (
-                    f"Bearer {self.api_key}"
-                ),
-                "Content-Type": (
-                    "application/json"
-                ),
-                "Accept": (
-                    "application/json"
-                ),
-                "User-Agent": (
-                    "StockEventRadar-Android/1.0"
-                ),
-            },
-        )
+        # One retry only, and only for transport-level interruption.
+        # HTTP status errors (401/402/429/etc.) are never retried here.
+        max_attempts = 2
 
-        try:
-            with urllib.request.urlopen(
-                request,
-                timeout=self.timeout,
-                context=self.ssl_context,
-            ) as response:
-                raw = response.read()
-
-        except urllib.error.HTTPError as exc:
+        for attempt in range(
+            1,
+            max_attempts + 1,
+        ):
             try:
-                detail = (
-                    exc.read()
-                    .decode(
-                        "utf-8",
-                        errors="replace",
-                    )
+                raw = self._request_once(
+                    url=url,
+                    body=body,
                 )
-            except Exception:
-                detail = ""
+                break
 
-            diag = key_diagnostic(
-                self.api_key
-            )
+            except urllib.error.HTTPError as exc:
+                try:
+                    detail = (
+                        exc.read()
+                        .decode(
+                            "utf-8",
+                            errors="replace",
+                        )
+                    )
+                except Exception:
+                    detail = ""
 
-            self.logger.warning(
-                "Android HTTP error %s "
-                "url=%s key=%s",
-                exc.code,
-                url,
-                diag.compact(),
-            )
+                diag = key_diagnostic(
+                    self.api_key
+                )
 
-            raise RuntimeError(
-                f"HTTP {exc.code}："
-                f"{detail[:1200] or exc.reason}"
-                f"\n\nKey诊断：{diag.compact()}"
-            ) from exc
+                self.logger.warning(
+                    "Android HTTP error %s "
+                    "url=%s key=%s",
+                    exc.code,
+                    url,
+                    diag.compact(),
+                )
 
-        except urllib.error.URLError as exc:
-            reason = exc.reason
-
-            if isinstance(
-                reason,
-                ssl.SSLCertVerificationError,
-            ):
                 raise RuntimeError(
-                    "TLS 证书校验失败。"
-                    "Android 已使用 Mozilla CA 证书库；"
-                    "如果仍出现此错误，请检查手机是否启用了"
-                    "抓包代理、VPN、HTTPS 过滤或公司/校园 Wi-Fi，"
-                    "可切换到 5G/其他 Wi-Fi 后重试。"
-                    f"\n\n详细信息：{reason}"
+                    f"HTTP {exc.code}："
+                    f"{detail[:1200] or exc.reason}"
+                    f"\n\nKey诊断：{diag.compact()}"
                 ) from exc
 
-            raise RuntimeError(
-                f"网络连接失败：{reason}"
-            ) from exc
+            except urllib.error.URLError as exc:
+                reason = exc.reason
 
-        except ssl.SSLCertVerificationError as exc:
-            raise RuntimeError(
-                "TLS 证书校验失败。"
-                "请检查代理/VPN/HTTPS 过滤，"
-                "或切换网络后重试。"
-                f"\n\n详细信息：{exc}"
-            ) from exc
+                if isinstance(
+                    reason,
+                    ssl.SSLCertVerificationError,
+                ):
+                    raise RuntimeError(
+                        "TLS 证书校验失败。"
+                        "请检查代理/VPN/HTTPS 过滤，"
+                        "或切换网络后重试。"
+                        f"\n\n详细信息：{reason}"
+                    ) from exc
 
-        except Exception as exc:
+                transient = isinstance(
+                    reason,
+                    (
+                        socket.timeout,
+                        TimeoutError,
+                        ConnectionResetError,
+                        http.client.RemoteDisconnected,
+                    ),
+                )
+
+                if (
+                    transient
+                    and attempt < max_attempts
+                ):
+                    self.logger.warning(
+                        "Android transient URL error; "
+                        "retrying attempt=%s/%s reason=%r",
+                        attempt,
+                        max_attempts,
+                        reason,
+                    )
+                    time.sleep(
+                        1.25 * attempt
+                    )
+                    continue
+
+                raise RuntimeError(
+                    f"网络连接失败：{reason}"
+                ) from exc
+
+            except (
+                http.client.IncompleteRead,
+                http.client.RemoteDisconnected,
+                socket.timeout,
+                TimeoutError,
+                ConnectionResetError,
+            ) as exc:
+                if attempt < max_attempts:
+                    self.logger.warning(
+                        "Android HTTP transport interrupted; "
+                        "retrying attempt=%s/%s error=%r",
+                        attempt,
+                        max_attempts,
+                        exc,
+                    )
+                    time.sleep(
+                        1.25 * attempt
+                    )
+                    continue
+
+                raise RuntimeError(
+                    "Android 联网响应被中途截断，"
+                    "已自动重试 1 次仍未完成。"
+                    "这通常是长请求在移动网络链路中被提前关闭。"
+                    f"\n\n详细信息：{exc}"
+                ) from exc
+
+            except ssl.SSLCertVerificationError as exc:
+                raise RuntimeError(
+                    "TLS 证书校验失败。"
+                    "请检查代理/VPN/HTTPS 过滤，"
+                    "或切换网络后重试。"
+                    f"\n\n详细信息：{exc}"
+                ) from exc
+
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Android 网络请求失败：{exc}"
+                ) from exc
+
+        else:
             raise RuntimeError(
-                f"Android 网络请求失败：{exc}"
-            ) from exc
+                "Android 网络请求没有得到响应。"
+            )
 
         try:
-            data = json.loads(
-                raw.decode(
-                    "utf-8",
-                    errors="strict",
-                )
+            return _decode_json_bytes(
+                raw
             )
         except Exception as exc:
             raise RuntimeError(
                 "API 返回内容不是有效 JSON。"
             ) from exc
-
-        if not isinstance(
-            data,
-            dict,
-        ):
-            raise RuntimeError(
-                "API 返回 JSON 顶层不是对象。"
-            )
-
-        return data
 
 
 class _ChatCompletions:
@@ -335,6 +453,7 @@ class _ChatCompletions:
                 kwargs,
             )
         )
+
         return _to_namespace(
             data
         )
@@ -390,13 +509,6 @@ class _Responses:
 
 
 class AndroidOpenAICompat:
-    """
-    Small OpenAI-compatible Android client.
-
-    It deliberately avoids the desktop OpenAI SDK dependency tree,
-    while keeping HTTPS certificate and hostname verification enabled.
-    """
-
     def __init__(
         self,
         *,
@@ -404,19 +516,15 @@ class AndroidOpenAICompat:
         base_url: str,
         timeout: float = 120.0,
     ):
-        transport = (
-            _HttpTransport(
-                api_key=api_key,
-                base_url=base_url,
-                timeout=timeout,
-            )
+        transport = _HttpTransport(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout,
         )
 
         self.chat = _Chat(
             transport
         )
-        self.responses = (
-            _Responses(
-                transport
-            )
+        self.responses = _Responses(
+            transport
         )

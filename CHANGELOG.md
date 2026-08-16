@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.0.0-rc4.21
+
+### Android touch scrolling + analysis transport stability + mobile layouts
+- Android 所有 Qt scroll viewport 启用 QScroller TouchGesture：
+  手指可直接拖动/惯性滚动，不再必须抓右侧滚动条。
+- 普通页面在 Android 下放入外层 QScrollArea；
+  自动任务页保留其自身已有滚动容器。
+- QTextBrowser、QTableWidget、QScrollArea 等内层滚动视图也统一启用触摸滚动。
+- 首页 DeepSeek 联网研究遇到 `IncompleteRead` 时：
+  - 若 partial bytes 已经是完整 JSON，则直接恢复
+  - 否则仅对传输级中断自动重试 1 次
+  - HTTP 401/402/429 等状态错误不会自动重试
+  - 请求增加 `Accept-Encoding: identity` 与 `Connection: close`
+  - DeepSeek 联网研究超时从默认 120 秒提高到 180 秒
+- Android 首页进度表隐藏 Token / 成本两列，只保留：
+  任务、模型、状态、耗时。
+- Android 首页结果区域固定足够高度，并由页面滚动承载整体内容。
+- 晨报/报告中心 Android 改成真正纵向布局：
+  分析记录、报告类型、生成按钮、归档、打开、复制、导出分行显示。
+- AI 设置页的 Key 安全诊断仍保留在日志/错误弹窗，
+  页面只显示“长度 + 末尾4位”，减少遮挡。
+- Windows 桌面布局保持原样。
+- RC4.20 的 Android CI patch self-test 保留。
+
 ## 1.0.0-rc4.20
 
 ### Fix Android CI patch regression

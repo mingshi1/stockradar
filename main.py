@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 
-APP_VERSION = "1.0.0-rc4.20"
+APP_VERSION = "1.0.0-rc4.21"
 
 
 def _stage(

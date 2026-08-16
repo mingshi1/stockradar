@@ -366,6 +366,26 @@ QTabBar::tab {
     color: #ffffff;
 }
 
+
+QScrollArea#mobilePageScroll {
+    background-color: #f5f6f8;
+    border: none;
+}
+
+QScrollArea#mobilePageScroll > QWidget > QWidget {
+    background-color: #f5f6f8;
+}
+
+QScrollBar:vertical {
+    width: 8px;
+    margin: 0px;
+}
+
+QScrollBar:horizontal {
+    height: 8px;
+    margin: 0px;
+}
+
 /* Android popup: never allow white text on white background. */
 QComboBox QAbstractItemView {
     background-color: #ffffff;
