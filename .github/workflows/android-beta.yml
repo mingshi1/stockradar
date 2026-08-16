@@ -60,6 +60,38 @@ jobs:
           print("PySide6 path:", PySide6.__file__)
           PY
 
+      - name: Install pyside6-android-deploy runtime dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          ANDROID_REQ="$(python - <<'PY'
+          from pathlib import Path
+          import PySide6
+
+          path = (
+              Path(PySide6.__file__).resolve().parent
+              / "scripts"
+              / "requirements-android.txt"
+          )
+          print(path)
+          PY
+          )"
+
+          echo "PySide6 Android deploy requirements:"
+          echo "$ANDROID_REQ"
+
+          test -f "$ANDROID_REQ"
+          cat "$ANDROID_REQ"
+
+          python -m pip install -r "$ANDROID_REQ"
+          python -m pip check
+
+          python - <<'PY'
+          import pkginfo
+          print("pkginfo:", getattr(pkginfo, "__version__", "installed"))
+          PY
+
       - name: Verify official Android wheel URLs
         shell: bash
         run: |
@@ -108,8 +140,6 @@ jobs:
         run: |
           set -euxo pipefail
 
-          # Qt's official Android cross-compilation instructions require BOTH
-          # the repository root requirements and the Android tool requirements.
           python -m pip install \
             -r pyside-setup/requirements.txt
 
@@ -122,9 +152,11 @@ jobs:
           import git
           import packaging
           import packaging.version
+          import pkginfo
 
           print("GitPython:", git.__version__)
           print("packaging:", packaging.__version__)
+          print("pkginfo:", getattr(pkginfo, "__version__", "installed"))
           print(
               "packaging.version.Version OK:",
               packaging.version.Version("6.11.1"),
@@ -182,7 +214,7 @@ jobs:
       - name: Upload Android Beta
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Beta-1.0.0-rc4.3
+          name: StockEventRadar-Android-Beta-1.0.0-rc4.4
           if-no-files-found: error
           path: android-output/*
 
@@ -190,7 +222,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.3
+          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.4
           if-no-files-found: ignore
           include-hidden-files: true
           path: |

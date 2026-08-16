@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.0-rc4.4
+
+### Android CI hotfix
+- RC4.3 已成功进入 `Build Android APK Beta` 阶段。
+- 修复 `pyside6-android-deploy` 启动时缺少 `pkginfo`。
+- 不再单独手写 `pip install pkginfo`，而是自动定位并安装当前
+  PySide6 自带的 `scripts/requirements-android.txt`。
+- 增加 `pkginfo` import 预检。
+- Android Artifact 更新为
+  `StockEventRadar-Android-Beta-1.0.0-rc4.4`。
+
 ## 1.0.0-rc4.3
 
 ### Android CI hotfix
