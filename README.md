@@ -1,4 +1,4 @@
-# AI板块事件雷达 v1.0.0-rc4.2.1
+# AI板块事件雷达 v1.0.0-rc4.3.1
 
 V0.9 的主题是：
 
@@ -175,8 +175,8 @@ Windows 可以：
 或者：
 
 ```text
-git tag v1.0.0-rc4.2.1
-git push origin v1.0.0-rc4.2.1
+git tag v1.0.0-rc4.3.1
+git push origin v1.0.0-rc4.3.1
 ```
 
 触发 Release 构建。
@@ -339,7 +339,7 @@ V1.0 不再大改架构。
 
 ---
 
-# V1.0.0 RC4.2 Hotfix
+# V1.0.0 RC4.3 Hotfix
 
 本修订专门修复两项 V0.9 Windows 测试问题：
 
@@ -376,7 +376,7 @@ Unblock-File .\scripts\build_windows.ps1
 
 ---
 
-# V1.0.0 RC4.2 Windows Build Hotfix
+# V1.0.0 RC4.3 Windows Build Hotfix
 
 如果旧版构建日志出现：
 
@@ -389,7 +389,7 @@ FileNotFoundError:
 
 说明 Nuitka 编译已经成功，失败发生在最终复制阶段。
 
-V1.0.0 RC4.2 会在编译前创建：
+V1.0.0 RC4.3 会在编译前创建：
 
 ```text
 dist\
@@ -413,7 +413,7 @@ dist\StockEventRadar.exe
 
 ---
 
-# V1.0.0 RC4.2：Windows 构建缓存转移到 D 盘
+# V1.0.0 RC4.3：Windows 构建缓存转移到 D 盘
 
 默认大型构建工作区：
 
@@ -455,7 +455,7 @@ D:\coding\stock-event-radar
 
 ---
 
-# V1.0.0 RC4.2：自动任务中心
+# V1.0.0 RC4.3：自动任务中心
 
 本候选版新增：
 
@@ -479,7 +479,7 @@ V1_RC1_TEST_PLAN.md
 
 ---
 
-# V1.0.0 RC4.2
+# V1.0.0 RC4.3
 
 RC3 将邮件/SMTP功能从正式范围中移除，聚焦：
 - 自动定时分析
@@ -498,7 +498,7 @@ RC3 将邮件/SMTP功能从正式范围中移除，聚焦：
 
 ---
 
-# V1.0.0 RC4.2
+# V1.0.0 RC4.3
 
 RC4 重点是发布流水线可靠性：
 
@@ -510,3 +510,16 @@ RC4 重点是发布流水线可靠性：
 - 不再要求手工填写 Android wheel URL
 
 详细步骤见 `V1_RC4_TEST_PLAN.md`。
+
+
+---
+
+# V1.0.0 RC4.3
+
+Android CI 继续修复 Qt 官方交叉编译工具依赖：
+
+- 同时安装 pyside-setup 根 requirements 与 Android tool requirements
+- 验证 GitPython / packaging
+- GitHub Runner 固定 JDK 21
+
+详见 `V1_RC4_3_TEST_PLAN.md`。

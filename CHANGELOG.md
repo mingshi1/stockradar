@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.0-rc4.3
+
+### Android CI hotfix
+- RC4.2 已成功解决 GitPython 缺失问题。
+- 修复 SDK/NDK 下载阶段：
+  `ModuleNotFoundError: No module named 'packaging'`。
+- 按 Qt 官方 Android 交叉编译步骤同时安装：
+  - `pyside-setup/requirements.txt`
+  - `pyside-setup/tools/cross_compile_android/requirements.txt`
+- 增加 `import packaging` 和 `packaging.version.Version` 预检。
+- GitHub Android Runner 固定 JDK 21，与 Qt 6.11 当前 Android 支持配置一致。
+- 增加 Java/JAVA_HOME 诊断。
+- Android Artifact 更新为
+  `StockEventRadar-Android-Beta-1.0.0-rc4.3`。
+
 ## 1.0.0-rc4.2
 
 ### Android CI hotfix

@@ -26,14 +26,39 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
+      - name: Setup Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Verify Java
+        shell: bash
+        run: |
+          set -euxo pipefail
+          java -version
+          javac -version
+          echo "JAVA_HOME=$JAVA_HOME"
+
       - name: Install app build environment
         shell: bash
         run: |
           set -euxo pipefail
+
           python -m pip install --upgrade pip
           python -m pip install -r requirements-android.txt
           python -m pip check
-          python -c "import PySide6, PySide6.QtCore; print('PySide6', PySide6.__version__); print('Qt', PySide6.QtCore.__version__)"
+
+          python - <<'PY'
+          import sys
+          import PySide6
+          import PySide6.QtCore
+
+          print("Python:", sys.version)
+          print("PySide6:", PySide6.__version__)
+          print("Qt:", PySide6.QtCore.__version__)
+          print("PySide6 path:", PySide6.__file__)
+          PY
 
       - name: Verify official Android wheel URLs
         shell: bash
@@ -50,6 +75,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
+
           mkdir -p android-wheels
 
           curl --fail --location --retry 3 \
@@ -73,21 +99,37 @@ jobs:
           git clone --depth 1 --branch "$QT_FOR_PYTHON_BRANCH" \
             https://code.qt.io/pyside/pyside-setup
 
+          test -f pyside-setup/requirements.txt
           test -f pyside-setup/tools/cross_compile_android/requirements.txt
           test -f pyside-setup/tools/cross_compile_android/main.py
 
-      - name: Install Qt Android tool dependencies
+      - name: Install Qt for Python tool dependencies
         shell: bash
         run: |
           set -euxo pipefail
+
+          # Qt's official Android cross-compilation instructions require BOTH
+          # the repository root requirements and the Android tool requirements.
+          python -m pip install \
+            -r pyside-setup/requirements.txt
 
           python -m pip install \
             -r pyside-setup/tools/cross_compile_android/requirements.txt
 
           python -m pip check
 
-          # The Qt helper imports `git` from the GitPython package.
-          python -c "import git; print('GitPython OK:', git.__version__)"
+          python - <<'PY'
+          import git
+          import packaging
+          import packaging.version
+
+          print("GitPython:", git.__version__)
+          print("packaging:", packaging.__version__)
+          print(
+              "packaging.version.Version OK:",
+              packaging.version.Version("6.11.1"),
+          )
+          PY
 
       - name: Download matching Android SDK and NDK
         shell: bash
@@ -100,12 +142,16 @@ jobs:
             --auto-accept-license
 
           echo "Qt Android deploy cache:"
-          find "$HOME/.pyside6-android-deploy" -maxdepth 3 -type d -print || true
+          find "$HOME/.pyside6-android-deploy" \
+            -maxdepth 4 \
+            -type d \
+            -print || true
 
       - name: Build Android APK Beta
         shell: bash
         run: |
           set -euxo pipefail
+
           chmod +x scripts/build_android.sh
 
           ./scripts/build_android.sh \
@@ -116,15 +162,19 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
+
           mkdir -p android-output
 
-          find . -maxdepth 7 \( -name "*.apk" -o -name "*.aab" \) \
+          find . -maxdepth 8 \( -name "*.apk" -o -name "*.aab" \) \
             -not -path "./android-output/*" \
             -exec cp -v {} android-output/ \;
 
           ls -lah android-output
 
-          if ! find android-output -type f \( -name "*.apk" -o -name "*.aab" \) | grep -q .; then
+          if ! find android-output \
+            -type f \
+            \( -name "*.apk" -o -name "*.aab" \) \
+            | grep -q .; then
             echo "No APK/AAB was produced."
             exit 1
           fi
@@ -132,7 +182,7 @@ jobs:
       - name: Upload Android Beta
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Beta-1.0.0-rc4.2
+          name: StockEventRadar-Android-Beta-1.0.0-rc4.3
           if-no-files-found: error
           path: android-output/*
 
@@ -140,8 +190,9 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.2
+          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.3
           if-no-files-found: ignore
+          include-hidden-files: true
           path: |
             pysidedeploy.spec
             .buildozer/**
