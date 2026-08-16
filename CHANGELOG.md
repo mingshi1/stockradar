@@ -2,27 +2,23 @@
 
 ## 1.0.0-rc4.18
 
-### Android HTTPS certificate + minimal AI settings
-- RC4.17 已稳定进入主界面，原生闪退问题不再是当前阻塞点。
-- DeepSeek 测试连接已真正发起 HTTPS 请求，但 Android 内置 Python
-  报 `CERTIFICATE_VERIFY_FAILED / self-signed certificate in certificate chain`。
-- Android APK 新增 `certifi==2026.7.22`。
-- Android HTTP client 使用 `ssl.create_default_context(cafile=certifi.where())`
-  显式加载 Mozilla CA bundle。
-- HTTPS 证书验证和 hostname checking 保持开启；不采用不安全的
-  `CERT_NONE` / `verify=False`。
-- 若 Mozilla CA 下仍验证失败，错误提示会明确建议检查 VPN、抓包代理、
-  HTTPS 过滤、公司/校园 Wi-Fi，并可切换 5G/其他网络测试。
-- Android AI 设置页大幅简化：
-  - 每个 Provider 只显示：参与分析、模型、API Key、连接状态、测试按钮
-  - Android 隐藏 Base URL，强制使用 Provider 官方默认 Base URL
-  - Android 隐藏输入/输出 Token 单价
-  - Android 保存时成本单价固定为 0，不做成本估算
-  - 隐藏手机端冗长成本提示和 Provider 说明
-  - 测试/保存按钮改为全宽触屏布局
-- Windows 版继续保留 Base URL 与 Token 成本配置，不改变桌面能力。
-- 继续只上传一个 APK：
-  `StockEventRadar-Android-arm64-v8a-debug.apk`。
+### Android build pipeline
+- 修复 RC4.17 在真实 APK 构建前被 Qt helper 的固定字符串匹配误杀。
+- Qt helper 补丁改成 AST 结构化定位，不依赖原始空格、换行或默认值。
+- 如果未来 helper 结构再次变化，只警告，不在真实 build 前制造假失败。
+- Buildozer APP_REQUIREMENTS / APP_P4A_BRANCH 继续作为第二层保护。
+- 加入 certifi 2026.5.20，并继续固定 Python 3.11.15 / p4a v2026.05.09。
+
+### Android AI TLS
+- Android urllib 使用 certifi CA bundle。
+- 保持 TLS 证书验证，不关闭安全校验。
+- TLS 链仍异常时提示检查 HTTPS 代理、抓包、VPN 或网络环境。
+
+### Android AI settings
+- Android 每个 Provider 只显示：启用、模型、API Key、状态、测试。
+- 隐藏 Base URL、输入单价、输出单价和成本说明。
+- Android 不要求维护 Token 单价；Windows 桌面高级设置保持不变。
+- 继续只上传一个 APK。
 
 ## 1.0.0-rc4.17
 

@@ -721,11 +721,6 @@ RC4.17 从 Android 运行路径彻底移除应用自定义的
 
 # V1.0.0 RC4.18
 
-Android AI 网络层新增 certifi Mozilla CA bundle，
-修复嵌入式 Python HTTPS 证书信任问题。
-
-Android AI 设置页改为最小配置：
-模型 + API Key + 是否参与分析 + 测试连接。
-手机端不再显示 Base URL 与 Token 成本单价。
-
-Windows 继续保留完整设置。
+修复 RC4.17 Android workflow 的脆弱 Qt helper 字符串匹配。
+Android AI 设置页精简为必要项，并使用打包 CA bundle 做 TLS 校验。
+继续保持单 APK 输出。

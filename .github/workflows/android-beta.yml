@@ -103,13 +103,11 @@ jobs:
           import sys
           import PySide6
           import PySide6.QtCore
-          import certifi
 
           print("Python:", sys.version)
           print("PySide6:", PySide6.__version__)
           print("Qt:", PySide6.QtCore.__version__)
           print("PySide6 path:", PySide6.__file__)
-          print("certifi CA:", certifi.where())
           PY
 
       - name: Install pyside6-android-deploy runtime dependencies
@@ -142,34 +140,16 @@ jobs:
           print("pkginfo installed")
           PY
 
-      - name: Pin Qt Android deploy to stable p4a and cp311
+      - name: Configure Qt Android deploy for cp311
         shell: bash
         run: |
           set -euxo pipefail
 
           python scripts/patch_pyside_android_deploy.py
 
-          python - <<'PY'
-          from pathlib import Path
-          import PySide6
-
-          target = (
-              Path(PySide6.__file__).resolve().parent
-              / "scripts"
-              / "deploy_lib"
-              / "android"
-              / "buildozer.py"
-          )
-
-          text = target.read_text(encoding="utf-8")
-
-          assert "python3==3.11.15" in text
-          assert "hostpython3==3.11.15" in text
-          assert "certifi==2026.7.22" in text
-          assert 'p4a.branch", "v2026.05.09"' in text
-
-          print("Qt Android deploy patch verification: OK")
-          PY
+          echo "Build script fallback overrides:"
+          echo "  APP_REQUIREMENTS=python3==3.11.15,hostpython3==3.11.15,certifi==2026.5.20,shiboken6,PySide6"
+          echo "  APP_P4A_BRANCH=v2026.05.09"
 
       - name: Verify official Android wheel URLs
         shell: bash

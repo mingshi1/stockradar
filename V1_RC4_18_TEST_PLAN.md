@@ -1,92 +1,50 @@
-# V1.0.0 RC4.18 Android 测试
+# V1.0.0 RC4.18
 
-## 本轮两个目标
+## GitHub Actions
 
-### 1. 修复 AI HTTPS 证书
-
-RC4.17 DeepSeek 测试出现：
+RC4.17 失败在：
 
 ```text
-SSL: CERTIFICATE_VERIFY_FAILED
-self-signed certificate in certificate chain
+Pin Qt Android deploy to stable p4a and cp311
+PySide6 buildozer.py requirements line did not match ...
 ```
 
-RC4.18 Android APK 打包：
+RC4.18 改为 AST 结构化补丁。
 
+预期：
 ```text
-certifi==2026.7.22
+Configure Qt Android deploy for cp311      ✓
+Verify official Android wheel URLs         ✓
+Download official Android ARM64 wheels     ✓
+Build Android APK Beta                     ✓
+Validate single Android APK                ✓
+Upload Android Beta                        ✓
 ```
 
-HTTPS client 显式使用 Mozilla CA bundle。
-
-没有关闭证书验证。
-
-### 2. 简化手机 AI 设置
-
-Android Provider 页只显示：
-
-```text
-☑ 参与多模型独立分析
-
-模型
-[ DeepSeek 模型 ▼ ]
-
-API Key
-[ *************** ]
-
-状态
-
-[ 测试此 Provider ]
-```
-
-以下项目 Android 不再显示：
-
-```text
-Base URL
-输入单价
-输出单价
-成本说明
-Provider 长说明
-```
-
-Base URL 自动使用软件内该 Provider 的官方默认地址。
-
-Android 成本单价统一按 0 保存，不做成本估算。
-
-Windows 仍保留完整成本设置。
-
-## DeepSeek 测试
-
-1. 卸载旧版或覆盖安装 RC4.18。
-2. AI 设置 → DeepSeek。
-3. 模型选择 `deepseek-v4-flash`。
-4. 输入 API Key。
-5. 点“测试此 Provider”。
-
-### 预期成功
-
-```text
-✓ API 连接成功
-```
-
-### 如果仍是 TLS 证书错误
-
-RC4.18 已使用 Mozilla CA。
-
-此时优先检查：
-- 手机 VPN
-- HTTP/HTTPS 抓包软件
-- 广告过滤/安全软件的 HTTPS 扫描
-- 公司/校园 Wi-Fi 的 HTTPS 中间证书
-
-可关闭 Wi-Fi，直接用 5G 再测试一次。
-
-不要关闭 SSL 证书验证。
-
-## APK
-
-仍然只有：
-
+最终仍只有：
 ```text
 StockEventRadar-Android-arm64-v8a-debug.apk
 ```
+
+## 手机 AI 设置
+
+只显示：
+```text
+启用
+模型
+API Key
+连接状态
+测试此 Provider
+```
+
+不显示 Base URL 和成本单价。
+
+## DeepSeek TLS
+
+RC4.17 出现 CERTIFICATE_VERIFY_FAILED。
+RC4.18 打包 CA bundle，并保持证书验证。
+
+若仍出现 TLS 证书链错误：
+- 关闭 HTTPS 抓包/代理
+- 临时关闭 VPN
+- 换手机移动数据或普通家用 Wi-Fi
