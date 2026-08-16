@@ -430,7 +430,7 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         version = QLabel(
-            "v1.0.0 RC4.19"
+            "v1.0.0 RC4.20"
         )
         version.setObjectName(
             "versionLabel"

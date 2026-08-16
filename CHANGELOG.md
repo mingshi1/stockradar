@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.0.0-rc4.20
+
+### Fix Android CI patch regression
+- 修复 RC4.19 GitHub Actions 在
+  `Pin Qt Android deploy to stable p4a and cp311`
+  步骤立即失败的问题。
+- 根因不是 GitHub Runner 或 Qt 随机变化，而是 RC4.19 自己的补丁脚本：
+  加入 certifi 时误把“待匹配的原始 requirements”也改成了已经含 certifi 的版本。
+- 干净 Runner 上原始 PySide6 6.11.1 helper 仍是
+  `python3,shiboken6,PySide6`，所以旧脚本精确字符串匹配必然失败。
+- 新补丁按 `self.set_value("app", key, value)` 结构定位，
+  不依赖完整旧行、引号风格或空白。
+- requirements 只验证原始值包含：
+  `python3 / shiboken6 / PySide6`
+- 然后统一改成：
+  `python3==3.11.15,hostpython3==3.11.15,shiboken6,PySide6,certifi==2026.7.22`
+- `p4a.branch` 继续固定 `v2026.05.09`。
+- 新增独立 CI 自测，覆盖三种 helper 文本格式。
+- RC4.19 的 Android Key 指纹诊断全部保留。
+
 ## 1.0.0-rc4.19
 
 ### Android API Key end-to-end diagnostics
