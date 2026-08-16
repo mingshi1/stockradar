@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.0.0-rc4.22
+
+### Android history/automation layout + scheduled network retry
+- Android 历史报告不再依赖窗口显示后的 HBox 动态换向。
+  页面创建时直接使用纵向结构：
+  - 上方历史记录列表
+  - 下方完整报告预览
+- 历史列表手机高度约 150~210px，报告预览最小高度 620px，
+  不再出现右侧详情被压成狭窄竖条。
+- 自动任务中心手机端继续收窄：
+  - 外层禁止横向滚动
+  - 表单标签在字段上方换行
+  - 时间区纵向
+  - Android 隐藏 Windows 时间同步按钮
+  - Android 隐藏桌面式“报告保存目录”选择控件
+  - 已保存任务表隐藏 ID / 最近运行，只保留名称、时间、状态、最近结果
+  - 最近运行记录只保留时间、任务、结果
+  - 表格去掉行号栏，限制合理高度
+  - 按钮改成手机两列/整行布局
+  - running / success / failed 显示为中文
+- 自动任务新增网络失败重试策略：
+  - 仅限网络/传输类失败
+  - 第一次失败后等待 300 秒（5 分钟）
+  - 自动重试 1 次
+  - 最多只重试 1 次，不形成循环
+  - 401/403/Key 无效/证书错误/余额/Quota/429 不重试
+  - 500/502/503/504、IncompleteRead、连接重置、超时等可重试
+- 等待期间 AutomationWorker 线程休眠，Qt 主界面不被冻结。
+- Windows `--run-task` 也使用同一重试逻辑；进程会保持到重试结束。
+- RC4.21 的 Android QScroller 触屏滚动与网络传输恢复逻辑继续保留。
+
 ## 1.0.0-rc4.21
 
 ### Android touch scrolling + analysis transport stability + mobile layouts

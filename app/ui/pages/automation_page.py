@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 
 from PySide6.QtCore import QTime, QTimer, Qt, Signal
+from app.platform import is_android
+
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -61,24 +63,43 @@ class AutomationPage(QWidget):
             QFrame.Shape.NoFrame
         )
 
+        if is_android():
+            scroll.setHorizontalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+            )
+
         body = QWidget()
         self.layout = QVBoxLayout(body)
         self.layout.setContentsMargins(
-            28,
-            24,
-            28,
-            28,
+            12 if is_android() else 28,
+            12 if is_android() else 24,
+            12 if is_android() else 28,
+            18 if is_android() else 28,
         )
-        self.layout.setSpacing(18)
+        self.layout.setSpacing(
+            12 if is_android() else 18
+        )
 
         title = QLabel("自动任务中心")
         title.setStyleSheet(
-            "font-size:24px;font-weight:700;"
+            (
+                "font-size:20px;font-weight:700;"
+                if is_android()
+                else "font-size:24px;font-weight:700;"
+            )
         )
 
         subtitle = QLabel(
-            "每天自动执行板块研究、生成报告，并保存到你指定的目录。"
-            " Windows 使用系统任务计划程序，因此主界面无需一直打开。"
+            (
+                "配置并测试自动分析任务。联网失败时会等待 5 分钟后"
+                "自动重试 1 次。Android Beta 的系统级后台调度仍受"
+                "系统后台限制。"
+            )
+            if is_android()
+            else (
+                "每天自动执行板块研究、生成报告，并保存到你指定的目录。"
+                " Windows 使用系统任务计划程序，因此主界面无需一直打开。"
+            )
         )
         subtitle.setWordWrap(True)
 
@@ -107,7 +128,11 @@ class AutomationPage(QWidget):
 
     def _build_time_group(self):
         group = QGroupBox("时间与时区")
-        layout = QHBoxLayout(group)
+        layout = (
+            QVBoxLayout(group)
+            if is_android()
+            else QHBoxLayout(group)
+        )
 
         self.clock_label = QLabel()
         self.clock_label.setStyleSheet(
@@ -126,6 +151,9 @@ class AutomationPage(QWidget):
         )
         self.sync_button.clicked.connect(
             self.sync_time_requested.emit
+        )
+        self.sync_button.setVisible(
+            not is_android()
         )
 
         layout.addLayout(text_box, 1)
@@ -166,12 +194,30 @@ class AutomationPage(QWidget):
         )
         form = QFormLayout(group)
 
+        if is_android():
+            form.setRowWrapPolicy(
+                QFormLayout.RowWrapPolicy.WrapAllRows
+            )
+            form.setFieldGrowthPolicy(
+                QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
+            )
+            form.setHorizontalSpacing(
+                6
+            )
+            form.setVerticalSpacing(
+                8
+            )
+
         self.task_name = QLineEdit(
             "每日晨报"
         )
 
         self.task_enabled = QCheckBox(
-            "启用 Windows 每日计划任务"
+            (
+                "启用任务"
+                if is_android()
+                else "启用 Windows 每日计划任务"
+            )
         )
         self.task_enabled.setChecked(True)
 
@@ -244,8 +290,14 @@ class AutomationPage(QWidget):
         )
 
         report_dir_row = QWidget()
-        report_dir_layout = QHBoxLayout(
-            report_dir_row
+        report_dir_layout = (
+            QVBoxLayout(
+                report_dir_row
+            )
+            if is_android()
+            else QHBoxLayout(
+                report_dir_row
+            )
         )
         report_dir_layout.setContentsMargins(
             0,
@@ -289,12 +341,17 @@ class AutomationPage(QWidget):
             "报告文件",
             self.generate_pdf,
         )
-        form.addRow(
-            "报告保存目录",
-            report_dir_row,
-        )
+        if not is_android():
+            form.addRow(
+                "报告保存目录",
+                report_dir_row,
+            )
 
-        buttons = QHBoxLayout()
+        buttons = (
+            QGridLayout()
+            if is_android()
+            else QHBoxLayout()
+        )
 
         self.new_task_button = QPushButton(
             "新建任务"
@@ -310,13 +367,25 @@ class AutomationPage(QWidget):
             self._emit_save_task
         )
 
-        buttons.addWidget(
-            self.new_task_button
-        )
-        buttons.addWidget(
-            self.save_task_button
-        )
-        buttons.addStretch()
+        if is_android():
+            buttons.addWidget(
+                self.new_task_button,
+                0,
+                0,
+            )
+            buttons.addWidget(
+                self.save_task_button,
+                0,
+                1,
+            )
+        else:
+            buttons.addWidget(
+                self.new_task_button
+            )
+            buttons.addWidget(
+                self.save_task_button
+            )
+            buttons.addStretch()
 
         form.addRow("", buttons)
 
@@ -418,6 +487,27 @@ class AutomationPage(QWidget):
         self.generate_pdf.setChecked(True)
         self.report_directory.clear()
 
+    @staticmethod
+    def _display_status(
+        value,
+    ) -> str:
+        raw = str(
+            value or "-"
+        ).strip()
+
+        mapping = {
+            "running": "运行中",
+            "success": "成功",
+            "failed": "失败",
+            "waiting": "等待重试",
+            "partial": "部分完成",
+        }
+
+        return mapping.get(
+            raw.lower(),
+            raw,
+        )
+
     # ---------------------------------------------------------
     # Tasks table
     # ---------------------------------------------------------
@@ -454,7 +544,53 @@ class AutomationPage(QWidget):
             self._load_selected_task
         )
 
-        buttons = QHBoxLayout()
+        if is_android():
+            self.task_table.verticalHeader().setVisible(
+                False
+            )
+            self.task_table.setHorizontalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+            )
+            self.task_table.setMinimumHeight(
+                180
+            )
+            self.task_table.setMaximumHeight(
+                270
+            )
+
+            # Hide desktop-only bookkeeping columns.
+            self.task_table.setColumnHidden(
+                0,
+                True,
+            )
+            self.task_table.setColumnHidden(
+                4,
+                True,
+            )
+
+            header = self.task_table.horizontalHeader()
+            header.setSectionResizeMode(
+                1,
+                QHeaderView.ResizeMode.Stretch,
+            )
+            header.setSectionResizeMode(
+                2,
+                QHeaderView.ResizeMode.ResizeToContents,
+            )
+            header.setSectionResizeMode(
+                3,
+                QHeaderView.ResizeMode.ResizeToContents,
+            )
+            header.setSectionResizeMode(
+                5,
+                QHeaderView.ResizeMode.ResizeToContents,
+            )
+
+        buttons = (
+            QGridLayout()
+            if is_android()
+            else QHBoxLayout()
+        )
 
         self.run_now_button = QPushButton(
             "立即执行"
@@ -476,16 +612,35 @@ class AutomationPage(QWidget):
             self.refresh_requested.emit
         )
 
-        buttons.addWidget(
-            self.run_now_button
-        )
-        buttons.addWidget(
-            self.delete_button
-        )
-        buttons.addWidget(
-            self.refresh_button
-        )
-        buttons.addStretch()
+        if is_android():
+            buttons.addWidget(
+                self.run_now_button,
+                0,
+                0,
+            )
+            buttons.addWidget(
+                self.delete_button,
+                0,
+                1,
+            )
+            buttons.addWidget(
+                self.refresh_button,
+                1,
+                0,
+                1,
+                2,
+            )
+        else:
+            buttons.addWidget(
+                self.run_now_button
+            )
+            buttons.addWidget(
+                self.delete_button
+            )
+            buttons.addWidget(
+                self.refresh_button
+            )
+            buttons.addStretch()
 
         layout.addWidget(
             self.task_table
@@ -527,9 +682,8 @@ class AutomationPage(QWidget):
                     task.get("last_run_at")
                     or "-"
                 ),
-                str(
+                self._display_status(
                     task.get("last_status")
-                    or "-"
                 ),
             ]
 
@@ -706,6 +860,45 @@ class AutomationPage(QWidget):
             QHeaderView.ResizeMode.Stretch,
         )
 
+        if is_android():
+            self.run_table.verticalHeader().setVisible(
+                False
+            )
+            self.run_table.setHorizontalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+            )
+            self.run_table.setMinimumHeight(
+                190
+            )
+            self.run_table.setMaximumHeight(
+                300
+            )
+
+            # Mobile summary: time / task / result only.
+            for column in (
+                3,
+                4,
+                5,
+            ):
+                self.run_table.setColumnHidden(
+                    column,
+                    True,
+                )
+
+            header = self.run_table.horizontalHeader()
+            header.setSectionResizeMode(
+                0,
+                QHeaderView.ResizeMode.ResizeToContents,
+            )
+            header.setSectionResizeMode(
+                1,
+                QHeaderView.ResizeMode.Stretch,
+            )
+            header.setSectionResizeMode(
+                2,
+                QHeaderView.ResizeMode.ResizeToContents,
+            )
+
         layout.addWidget(
             self.run_table
         )
@@ -733,7 +926,7 @@ class AutomationPage(QWidget):
                         "",
                     )
                 ),
-                str(
+                self._display_status(
                     item.get(
                         "status",
                         "",

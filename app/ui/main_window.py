@@ -456,7 +456,7 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         version = QLabel(
-            "v1.0.0 RC4.21"
+            "v1.0.0 RC4.22"
         )
         version.setObjectName(
             "versionLabel"
@@ -1539,9 +1539,13 @@ class MainWindow(QMainWindow):
                 self,
                 "自动任务完成",
                 (
-                    "分析、报告和已启用的后续动作均已完成。\n\n"
-                    f"分析 ID：{result.get('analysis_run_id')}\n"
-                    f"报告 ID：{result.get('report_id')}"
+                    (
+                        "首次联网失败，已等待 5 分钟自动重试成功。\n\n"
+                        if result.get("network_retried")
+                        else "分析、报告和已启用的后续动作均已完成。\n\n"
+                    )
+                    + f"分析 ID：{result.get('analysis_run_id')}\n"
+                    + f"报告 ID：{result.get('report_id')}"
                 ),
             )
         else:
