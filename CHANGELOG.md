@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.0-rc4.2
+
+### Android CI hotfix
+- RC4.1 已成功解决 Qt Android wheel 下载问题。
+- 修复 Android SDK/NDK 下载阶段：
+  `ModuleNotFoundError: No module named 'git'`。
+- clone Qt for Python 后，自动安装官方：
+  `tools/cross_compile_android/requirements.txt`。
+- 增加 `import git` / GitPython 预检。
+- 将 Qt 工具 clone、依赖安装、SDK/NDK 下载拆成独立步骤，
+  后续失败位置更清晰。
+- Android Artifact 更新为
+  `StockEventRadar-Android-Beta-1.0.0-rc4.2`。
+
 ## 1.0.0-rc4.1
 
 ### Android hotfix

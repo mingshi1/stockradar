@@ -26,7 +26,8 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Install build environment
+      - name: Install app build environment
+        shell: bash
         run: |
           set -euxo pipefail
           python -m pip install --upgrade pip
@@ -38,8 +39,6 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          echo "$PYSIDE_ANDROID_WHEEL_URL"
-          echo "$SHIBOKEN_ANDROID_WHEEL_URL"
 
           curl --fail --location --retry 3 --head \
             "$PYSIDE_ANDROID_WHEEL_URL"
@@ -66,7 +65,7 @@ jobs:
           test -s "android-wheels/pyside6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
           test -s "android-wheels/shiboken6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
 
-      - name: Download matching Android SDK and NDK
+      - name: Clone matching Qt for Python tools
         shell: bash
         run: |
           set -euxo pipefail
@@ -74,12 +73,34 @@ jobs:
           git clone --depth 1 --branch "$QT_FOR_PYTHON_BRANCH" \
             https://code.qt.io/pyside/pyside-setup
 
+          test -f pyside-setup/tools/cross_compile_android/requirements.txt
+          test -f pyside-setup/tools/cross_compile_android/main.py
+
+      - name: Install Qt Android tool dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          python -m pip install \
+            -r pyside-setup/tools/cross_compile_android/requirements.txt
+
+          python -m pip check
+
+          # The Qt helper imports `git` from the GitPython package.
+          python -c "import git; print('GitPython OK:', git.__version__)"
+
+      - name: Download matching Android SDK and NDK
+        shell: bash
+        run: |
+          set -euxo pipefail
+
           python pyside-setup/tools/cross_compile_android/main.py \
             --download-only \
             --skip-update \
             --auto-accept-license
 
-          ls -la "$HOME/.pyside6-android-deploy" || true
+          echo "Qt Android deploy cache:"
+          find "$HOME/.pyside6-android-deploy" -maxdepth 3 -type d -print || true
 
       - name: Build Android APK Beta
         shell: bash
@@ -97,7 +118,7 @@ jobs:
           set -euxo pipefail
           mkdir -p android-output
 
-          find . -maxdepth 6 \( -name "*.apk" -o -name "*.aab" \) \
+          find . -maxdepth 7 \( -name "*.apk" -o -name "*.aab" \) \
             -not -path "./android-output/*" \
             -exec cp -v {} android-output/ \;
 
@@ -111,7 +132,7 @@ jobs:
       - name: Upload Android Beta
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Beta-1.0.0-rc4.1
+          name: StockEventRadar-Android-Beta-1.0.0-rc4.2
           if-no-files-found: error
           path: android-output/*
 
@@ -119,9 +140,10 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.1
+          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.2
           if-no-files-found: ignore
           path: |
             pysidedeploy.spec
             .buildozer/**
             deployment/**
+            pyside-setup/tools/cross_compile_android/**

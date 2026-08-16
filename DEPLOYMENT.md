@@ -1,6 +1,6 @@
-# V1.0.0-rc4.1 Deployment Guide
+# V1.0.0-rc4.2 Deployment Guide
 
-V1.0.0-rc4.1 第一次把“开发项目”升级成“可发布项目”。
+V1.0.0-rc4.2 第一次把“开发项目”升级成“可发布项目”。
 
 ---
 
@@ -37,7 +37,7 @@ pyside6-deploy
 → Nuitka
 → dist\StockEventRadar.exe
 → Inno Setup
-→ installer\output\StockEventRadar-Setup-1.0.0-rc4.1.exe
+→ installer\output\StockEventRadar-Setup-1.0.0-rc4.2.exe
 ```
 
 如果暂时没有 Inno Setup：
@@ -67,15 +67,15 @@ Actions → Windows Release Build → Run workflow
 也支持推送 tag：
 
 ```powershell
-git tag v1.0.0-rc4.1.1
-git push origin v1.0.0-rc4.1.1
+git tag v1.0.0-rc4.2.1
+git push origin v1.0.0-rc4.2.1
 ```
 
 tag 构建成功后，workflow 会尝试把：
 
 ```text
 StockEventRadar.exe
-StockEventRadar-Setup-1.0.0-rc4.1.exe
+StockEventRadar-Setup-1.0.0-rc4.2.exe
 ```
 
 上传到 GitHub Release。
@@ -203,7 +203,7 @@ API Key 不在这里。
 
 # 数据库 Migration
 
-V1.0.0-rc4.1 开始正式记录：
+V1.0.0-rc4.2 开始正式记录：
 
 ```text
 PRAGMA user_version
@@ -268,7 +268,7 @@ Unblock-File .\scripts\build_windows.ps1
 
 ## D 盘构建缓存
 
-V1.0.0-rc4.1 默认构建缓存：
+V1.0.0-rc4.2 默认构建缓存：
 
 ```text
 D:\StockEventRadarBuild
