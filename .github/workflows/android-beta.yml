@@ -10,6 +10,7 @@ env:
   QT_FOR_PYTHON_VERSION: "6.11.1"
   QT_FOR_PYTHON_BRANCH: "6.11"
   ANDROID_PYTHON_VERSION: "3.11.15"
+  P4A_RELEASE: "v2026.05.09"
   PYSIDE_ANDROID_WHEEL_FILENAME: "pyside6-6.11.1-6.11.1-cp311-cp311-android_aarch64.whl"
   SHIBOKEN_ANDROID_WHEEL_FILENAME: "shiboken6-6.11.1-6.11.1-cp311-cp311-android_aarch64.whl"
   PYSIDE_ANDROID_WHEEL_URL: "https://download.qt.io/official_releases/QtForPython/pyside6/pyside6-6.11.1-6.11.1-cp311-cp311-android_aarch64.whl"
@@ -91,6 +92,34 @@ jobs:
           python - <<'PY'
           import pkginfo
           print("pkginfo installed")
+          PY
+
+      - name: Pin Qt Android deploy to stable p4a and cp311
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          python scripts/patch_pyside_android_deploy.py
+
+          python - <<'PY'
+          from pathlib import Path
+          import PySide6
+
+          target = (
+              Path(PySide6.__file__).resolve().parent
+              / "scripts"
+              / "deploy_lib"
+              / "android"
+              / "buildozer.py"
+          )
+
+          text = target.read_text(encoding="utf-8")
+
+          assert "python3==3.11.15" in text
+          assert "hostpython3==3.11.15" in text
+          assert 'p4a.branch", "v2026.05.09"' in text
+
+          print("Qt Android deploy patch verification: OK")
           PY
 
       - name: Verify official Android wheel URLs
@@ -256,7 +285,7 @@ jobs:
       - name: Upload Android Beta
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Beta-1.0.0-rc4.8
+          name: StockEventRadar-Android-Beta-1.0.0-rc4.9
           if-no-files-found: error
           path: android-output/*
 
@@ -264,7 +293,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.8
+          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.9
           if-no-files-found: ignore
           include-hidden-files: true
           path: |
@@ -275,6 +304,10 @@ jobs:
             .buildozer/**
             deployment/**
             android-output/**
+            android-deploy.log
+            buildozer.spec
+            .android-artifacts-found.txt
+            .android-build-start
             .android-artifacts-found.txt
             .android-build-start
             pysidedeploy.spec

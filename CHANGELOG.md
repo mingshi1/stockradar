@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.0.0-rc4.9
+
+### Android pipeline stabilization
+- 修正 RC4.7/RC4.8 的 Python 3.14 误报检测：
+  p4a 仓库里的 `3.14_*.patch` 文件并不等于本次目标 Python 是 3.14。
+- 不再通过 p4a 源码中的补丁文件名判断目标 Python 版本。
+- 固定 python-for-android 为正式 release `v2026.05.09`，
+  不再跟随不断变化的 `develop`。
+- 在 GitHub 临时环境中 patch Qt 6.11.1 Android deploy helper，
+  让生成的 Buildozer 配置直接使用：
+  `python3==3.11.15,hostpython3==3.11.15,shiboken6,PySide6`。
+- 同时保留 Buildozer 官方 `APP_REQUIREMENTS` / `APP_P4A_BRANCH`
+  环境覆盖作为双保险。
+- 完整保存 `android-deploy.log`。
+- 即使 `pyside6-android-deploy` 外层进程返回 0，
+  只要日志出现 Buildozer traceback / non-zero exit，也会正确判为失败。
+- 失败时自动打印最相关错误行和完整日志尾部。
+- Android Artifact 更新为
+  `StockEventRadar-Android-Beta-1.0.0-rc4.9`。
+
 ## 1.0.0-rc4.8
 
 ### Android wheel validation hotfix

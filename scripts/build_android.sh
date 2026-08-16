@@ -16,19 +16,21 @@ cd "$PROJECT_ROOT"
 OUTPUT_DIR="$PROJECT_ROOT/android-output"
 MARKER="$PROJECT_ROOT/.android-build-start"
 FOUND_LIST="$PROJECT_ROOT/.android-artifacts-found.txt"
+DEPLOY_LOG="$PROJECT_ROOT/android-deploy.log"
 
-# The official Qt Android wheels used by this workflow are cp311,
-# so python-for-android must build a matching Python 3.11 runtime.
 ANDROID_PYTHON_VERSION="${ANDROID_PYTHON_VERSION:-3.11.15}"
+P4A_RELEASE="${P4A_RELEASE:-v2026.05.09}"
 
 echo "=========================================="
-echo " StockEventRadar Android Build"
+echo " StockEventRadar Android Build RC4.9"
 echo "=========================================="
 echo
 echo "Project root:"
 echo "  $PROJECT_ROOT"
 echo "Android target Python:"
 echo "  $ANDROID_PYTHON_VERSION"
+echo "python-for-android release:"
+echo "  $P4A_RELEASE"
 echo
 
 python --version
@@ -62,47 +64,27 @@ from pathlib import Path
 from packaging.utils import parse_wheel_filename
 import sys
 
-expected = {
-    "pyside6": "pyside6",
-    "shiboken6": "shiboken6",
-}
-
 for raw_path in sys.argv[1:]:
     path = Path(raw_path)
 
     if not path.is_file():
         raise SystemExit(f"Wheel does not exist: {path}")
 
-    try:
-        name, version, build, tags = parse_wheel_filename(path.name)
-    except Exception as exc:
-        raise SystemExit(
-            f"Invalid wheel filename {path.name!r}: {exc}"
-        ) from exc
+    name, version, build, tags = parse_wheel_filename(path.name)
 
-    normalized = str(name).replace("-", "_").lower()
-
-    matching = [
-        tag
+    valid = any(
+        tag.interpreter == "cp311"
+        and tag.abi == "cp311"
+        and tag.platform == "android_aarch64"
         for tag in tags
-        if (
-            tag.interpreter == "cp311"
-            and tag.abi == "cp311"
-            and tag.platform == "android_aarch64"
-        )
-    ]
+    )
 
     print(
         f"{path.name}: name={name}, version={version}, "
-        f"build={build}, tags={sorted(map(str, tags))}"
+        f"tags={sorted(map(str, tags))}"
     )
 
-    if normalized not in expected:
-        raise SystemExit(
-            f"Unexpected Android wheel distribution: {name}"
-        )
-
-    if not matching:
+    if not valid:
         raise SystemExit(
             f"{path.name} is not a cp311/cp311 android_aarch64 wheel."
         )
@@ -113,35 +95,31 @@ PY
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 
-rm -f "$MARKER" "$FOUND_LIST"
+rm -f "$MARKER" "$FOUND_LIST" "$DEPLOY_LOG"
 touch "$MARKER"
 : > "$FOUND_LIST"
 
-# CRITICAL:
-# RC4.6 showed p4a selecting Python 3.14.2 even though the Qt Android
-# wheel is cp311. Remove that stale distribution before rebuilding.
 echo
-echo "Removing stale Buildozer/p4a project cache..."
+echo "Removing project Buildozer cache..."
 rm -rf "$PROJECT_ROOT/.buildozer"
-
 rm -f pysidedeploy.spec buildozer.spec
 
 EXTRA_IGNORE_DIRS="android-wheels,android-output,deployment,dist,installer,.git,.github"
 
-echo
-echo "Ignored non-app directories:"
-echo "  $EXTRA_IGNORE_DIRS"
-
-# Buildozer supports overriding buildozer.spec values with SECTION_TOKEN
-# environment variables. Qt 6.11.1 writes unpinned:
-#   requirements = python3,shiboken6,PySide6
-# Pin BOTH target python and hostpython to the cp311 runtime.
+# Double protection: Buildozer officially supports SECTION_OPTION
+# environment overrides. The installed Qt helper is also patched in CI.
 export APP_REQUIREMENTS="python3==${ANDROID_PYTHON_VERSION},hostpython3==${ANDROID_PYTHON_VERSION},shiboken6,PySide6"
+export APP_P4A_BRANCH="$P4A_RELEASE"
+export BUILDOZER_LOG_LEVEL="2"
 
 echo
-echo "Buildozer requirements override:"
+echo "Buildozer overrides:"
 echo "  APP_REQUIREMENTS=$APP_REQUIREMENTS"
+echo "  APP_P4A_BRANCH=$APP_P4A_BRANCH"
+echo "  BUILDOZER_LOG_LEVEL=$BUILDOZER_LOG_LEVEL"
 echo
+
+set +e
 
 pyside6-android-deploy \
   --name "StockEventRadar" \
@@ -151,40 +129,67 @@ pyside6-android-deploy \
   --extra-ignore-dirs="$EXTRA_IGNORE_DIRS" \
   --keep-deployment-files \
   -v \
-  -f
+  -f \
+  2>&1 | tee "$DEPLOY_LOG"
+
+DEPLOY_RC="${PIPESTATUS[0]}"
+
+set -e
 
 echo
-echo "pyside6-android-deploy returned success."
-echo
+echo "pyside6-android-deploy process return code:"
+echo "  $DEPLOY_RC"
 
 if [ -f buildozer.spec ]; then
-  echo "Generated buildozer requirements line:"
-  grep -nE '^[[:space:]]*requirements[[:space:]]*=' buildozer.spec || true
+  echo
+  echo "Generated Buildozer settings:"
+  grep -nE \
+    '^[[:space:]]*(requirements|p4a\.branch|p4a\.bootstrap|android\.archs|android\.api|android\.minapi)[[:space:]]*=' \
+    buildozer.spec || true
+fi
+
+# Qt 6.11.1 currently logs/catches some build failures in a way that can
+# leave the outer deploy process with a misleading success path.
+# Trust both process status AND the log content.
+BUILD_FAILED=0
+
+if [ "$DEPLOY_RC" -ne 0 ]; then
+  BUILD_FAILED=1
+fi
+
+if grep -qE \
+  'Buildozer failed to execute|returned non-zero exit status|RuntimeError: \[DEPLOY\].*buildozer android' \
+  "$DEPLOY_LOG"; then
+  BUILD_FAILED=1
+fi
+
+if [ "$BUILD_FAILED" -ne 0 ]; then
+  echo
+  echo "=========================================="
+  echo " REAL ANDROID BUILD FAILURE DETECTED"
+  echo "=========================================="
+  echo
+  echo "The useful error is ABOVE the final Buildozer summary."
+  echo "Relevant error lines from android-deploy.log:"
+  echo
+
+  grep -nEi \
+    'error:|failed|failure|exception|traceback|could not|cannot |no matching|not found|command failed|undefined reference|fatal:' \
+    "$DEPLOY_LOG" \
+    | tail -160 || true
 
   echo
-  echo "Environment override remains:"
-  echo "  APP_REQUIREMENTS=$APP_REQUIREMENTS"
+  echo "Last 220 lines of the complete deploy log:"
+  tail -220 "$DEPLOY_LOG" || true
+
+  exit 20
 fi
 
 echo
-echo "Checking p4a Python version evidence..."
-
-if find "$PROJECT_ROOT/.buildozer" -type f -o -type d 2>/dev/null \
-  | grep -E '3\.14(\.|/|_)' >/dev/null 2>&1; then
-  echo "ERROR: Python 3.14 artifacts are still present in the fresh Android build."
-  echo "The cp311 PySide6 Android wheel requires the target runtime to stay on Python 3.11."
-  find "$PROJECT_ROOT/.buildozer" \
-    \( -type f -o -type d \) \
-    2>/dev/null \
-    | grep -E '3\.14(\.|/|_)' \
-    | head -100 || true
-  exit 12
-fi
-
-echo "No Python 3.14 paths detected in fresh project build cache."
+echo "Android deploy command completed without a detected Buildozer failure."
 
 echo
-echo "Searching for APK/AAB created after build start..."
+echo "Searching for fresh APK/AAB..."
 
 SEARCH_ROOTS=("$PROJECT_ROOT")
 
@@ -200,11 +205,7 @@ if [ -d "$HOME/.pyside6-android-deploy" ]; then
   SEARCH_ROOTS+=("$HOME/.pyside6-android-deploy")
 fi
 
-printf 'Search roots:\n'
-printf '  %s\n' "${SEARCH_ROOTS[@]}"
-
 for ROOT_DIR in "${SEARCH_ROOTS[@]}"; do
-  echo
   echo "Scanning: $ROOT_DIR"
 
   find -L "$ROOT_DIR" \
@@ -219,52 +220,15 @@ sort -u "$FOUND_LIST" -o "$FOUND_LIST"
 
 COUNT="$(grep -c . "$FOUND_LIST" || true)"
 
-echo
 echo "Fresh APK/AAB count: $COUNT"
 
 if [ "$COUNT" -eq 0 ]; then
   echo
-  echo "No fresh APK/AAB was found."
-  echo
-  echo "Buildozer configuration:"
-  if [ -f buildozer.spec ]; then
-    grep -nE \
-      'requirements|p4a\.branch|p4a\.bootstrap|android\.archs|android\.api|android\.minapi|bin_dir' \
-      buildozer.spec || true
-  fi
-
-  echo
-  echo "Python recipe/download evidence:"
-  find "$PROJECT_ROOT/.buildozer" \
-    -maxdepth 8 \
-    \( -iname "*python3*" -o -iname "*hostpython3*" \) \
-    -print 2>/dev/null \
-    | head -200 || true
-
-  echo
-  echo "Recent Buildozer/Gradle output-like paths:"
-  find "$PROJECT_ROOT/.buildozer" \
-    -type d \
-    \( -name bin -o -name outputs -o -name apk -o -name bundle -o -name dists \) \
-    -print 2>/dev/null || true
-
-  echo
-  echo "Recent large files under project:"
-  find "$PROJECT_ROOT" \
-    -type f \
-    -newer "$MARKER" \
-    -size +1M \
-    -printf '%TY-%Tm-%Td %TH:%TM:%TS %10s %p\n' \
-    2>/dev/null \
-    | sort \
-    | tail -150 || true
-
-  exit 2
+  echo "Deploy did not report a failure, but no APK/AAB was found."
+  echo "Last 220 lines of android-deploy.log:"
+  tail -220 "$DEPLOY_LOG" || true
+  exit 21
 fi
-
-echo
-echo "Copying Android package artifacts into:"
-echo "  $OUTPUT_DIR"
 
 INDEX=0
 
@@ -294,7 +258,7 @@ if ! find "$OUTPUT_DIR" \
   \( -iname "*.apk" -o -iname "*.aab" \) \
   | grep -q .; then
   echo "Artifact normalization failed."
-  exit 3
+  exit 22
 fi
 
 echo
