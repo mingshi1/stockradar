@@ -18,11 +18,58 @@ env:
 
 jobs:
   android-beta:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Install Android native build prerequisites
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          sudo apt-get update
+
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            autoconf \
+            automake \
+            autopoint \
+            cmake \
+            gettext \
+            libffi-dev \
+            libltdl-dev \
+            libncurses5-dev \
+            libncursesw5-dev \
+            libssl-dev \
+            libtinfo6 \
+            libtool \
+            libtool-bin \
+            m4 \
+            pkg-config \
+            zlib1g-dev \
+            zip \
+            unzip
+
+          echo "Autotools versions:"
+          autoconf --version | head -1
+          automake --version | head -1
+          aclocal --version | head -1
+          libtoolize --version | head -1
+
+          ACLOCAL_DIR="$(aclocal --print-ac-dir)"
+          echo "aclocal system directory: $ACLOCAL_DIR"
+
+          test -f /usr/share/aclocal/ltdl.m4
+
+          if ! grep -q "LT_SYS_SYMBOL_USCORE" /usr/share/aclocal/ltdl.m4; then
+            echo "ERROR: libltdl-dev is installed but LT_SYS_SYMBOL_USCORE"
+            echo "was not found in /usr/share/aclocal/ltdl.m4"
+            exit 1
+          fi
+
+          echo "libltdl autoconf macro verification: OK"
+          grep -n "LT_SYS_SYMBOL_USCORE" /usr/share/aclocal/ltdl.m4 | head
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v6
@@ -285,7 +332,7 @@ jobs:
       - name: Upload Android Beta
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Beta-1.0.0-rc4.9
+          name: StockEventRadar-Android-Beta-1.0.0-rc4.10
           if-no-files-found: error
           path: android-output/*
 
@@ -293,7 +340,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.9
+          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.10
           if-no-files-found: ignore
           include-hidden-files: true
           path: |

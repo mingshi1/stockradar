@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.0-rc4.10
+
+### Android libffi / autotools prerequisite fix
+- 通过完整 `android-deploy.log` 定位到真实首个失败：
+  `libffi/autogen.sh`。
+- 具体错误：
+  `configure.ac:215: error: possibly undefined macro: LT_SYS_SYMBOL_USCORE`。
+- 不再修改 Python 3.11 / Qt 6.11.1 / p4a 版本组合。
+- GitHub Android Runner 固定为 `ubuntu-24.04`，减少 runner 漂移。
+- Android CI 在 Python/Qt 安装前显式安装 native build prerequisites：
+  autoconf、automake、autopoint、gettext、libtool、libtool-bin、
+  libltdl-dev、libffi-dev、pkg-config、m4、cmake、zlib/ssl/ncurses 等。
+- 特别验证 `/usr/share/aclocal/ltdl.m4` 存在。
+- 特别验证 `LT_SYS_SYMBOL_USCORE` 宏可在 `ltdl.m4` 中找到。
+- Android Artifact 更新为
+  `StockEventRadar-Android-Beta-1.0.0-rc4.10`。
+
 ## 1.0.0-rc4.9
 
 ### Android pipeline stabilization

@@ -22,7 +22,7 @@ ANDROID_PYTHON_VERSION="${ANDROID_PYTHON_VERSION:-3.11.15}"
 P4A_RELEASE="${P4A_RELEASE:-v2026.05.09}"
 
 echo "=========================================="
-echo " StockEventRadar Android Build RC4.9"
+echo " StockEventRadar Android Build RC4.10"
 echo "=========================================="
 echo
 echo "Project root:"
