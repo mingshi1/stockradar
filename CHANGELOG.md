@@ -1,5 +1,47 @@
 # Changelog
 
+## 1.0.0-rc4.15
+
+### Android runtime detection root fix
+- 修复 Android APK 中 `No module named 'openai'`。
+- 根因不是 API Key，而是 Python 3.11 Android 平台识别错误。
+- CPython 3.11 Android 运行时可能仍报告：
+  `sys.platform == "linux"`。
+- Android 检测改为：
+  1. `sys.platform == "android"`
+  2. Android-only `sys.getandroidapilevel()`
+  3. p4a/Buildozer Android 环境变量 fallback
+- 修复后 Android 会真正启用：
+  - `AndroidOpenAICompat` 标准库 API client
+  - Android session-only API Key 存储
+  - QStandardPaths Android 数据目录
+  - RC4.14 移动端字体和纵向布局
+  - Android 首次启动单页触屏界面
+- 启动日志增加无敏感信息的 runtime platform 诊断。
+- 继续只上传：
+  `StockEventRadar-Android-arm64-v8a-debug.apk`。
+
+## 1.0.0-rc4.14
+
+### Android mobile UI usability pass
+- Android 已能正常进入主界面，不再闪退。
+- Android 首次启动不再使用 QWizard：
+  改为单页、可滚动、底部固定“进入主界面”按钮。
+- 修复首次启动页面触屏操作像“无反应”的问题。
+- Android 全局字体和控件间距缩小：
+  标题、卡片标题、正文、按钮、表格、输入框统一移动端尺寸。
+- 顶部导航 QComboBox 使用显式 QListView：
+  白底黑字，选中为浅蓝底黑字。
+- 修复 Android 下拉菜单出现“白字白底，看起来一大片空白”的问题。
+- AI 设置页 Android 改为纵向表单：
+  避免 Provider、Judge、价格输入等控件在窄屏互相覆盖。
+- Android Token 单价输入后缀简化为 `/1M`。
+- 历史报告页 Android 改为上下布局，不再左右挤压。
+- 页面外边距在 Android 下统一缩小。
+- 删除活动页面中的旧 `V0.9` 文案，更新为 `V1.0`。
+- 继续只上传一个 APK：
+  `StockEventRadar-Android-arm64-v8a-debug.apk`。
+
 ## 1.0.0-rc4.13
 
 ### GitHub Actions YAML hotfix

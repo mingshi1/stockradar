@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QListView,
     QMainWindow,
     QMessageBox,
     QPushButton,
@@ -40,7 +41,8 @@ from app.ui.pages.settings_page import SettingsPage
 from app.ui.pages.stats_page import StatsPage
 from app.ui.pages.system_page import SystemPage
 from app.ui.onboarding import FirstRunWizard
-from app.ui.styles import APP_STYLE
+from app.ui.styles import get_app_style
+from app.platform import is_android
 from app.logging_setup import LOG_DIR
 from app.ui.workers import (
     AnalysisWorker,
@@ -104,7 +106,7 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._connect_signals()
         self.setStyleSheet(
-            APP_STYLE
+            get_app_style()
         )
 
         self.refresh_database_views()
@@ -240,6 +242,40 @@ class MainWindow(QMainWindow):
             QComboBox()
         )
 
+        if is_android():
+            popup_view = QListView(
+                self.mobile_nav_combo
+            )
+            popup_view.setUniformItemSizes(
+                True
+            )
+            popup_view.setStyleSheet(
+                """
+                QListView {
+                    background: #ffffff;
+                    color: #111827;
+                    border: 1px solid #cfd4dc;
+                    font-size: 13px;
+                }
+                QListView::item {
+                    background: #ffffff;
+                    color: #111827;
+                    min-height: 38px;
+                    padding: 4px 10px;
+                }
+                QListView::item:selected {
+                    background: #dbeafe;
+                    color: #111827;
+                }
+                """
+            )
+            self.mobile_nav_combo.setView(
+                popup_view
+            )
+            self.mobile_nav_combo.setMaxVisibleItems(
+                len(self.nav_items)
+            )
+
         for text, index in (
             self.nav_items
         ):
@@ -350,7 +386,7 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         version = QLabel(
-            "v1.0.0 RC1"
+            "v1.0.0 RC4.14"
         )
         version.setObjectName(
             "versionLabel"
@@ -511,6 +547,39 @@ class MainWindow(QMainWindow):
         self.mobile_nav.setVisible(
             mobile
         )
+
+        if mobile and is_android():
+            for page in (
+                self.dashboard_page,
+                self.history_page,
+                self.sector_page,
+                self.news_page,
+                self.stats_page,
+                self.report_page,
+                self.automation_page,
+                self.settings_page,
+                self.system_page,
+            ):
+                page_layout = page.layout()
+
+                if page_layout is not None:
+                    page_layout.setContentsMargins(
+                        14,
+                        12,
+                        14,
+                        16,
+                    )
+                    page_layout.setSpacing(
+                        9
+                    )
+
+            if hasattr(
+                self.history_page,
+                "set_mobile_mode",
+            ):
+                self.history_page.set_mobile_mode(
+                    True
+                )
 
     def change_ui_mode(
         self,

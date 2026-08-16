@@ -270,3 +270,145 @@ QComboBox QAbstractItemView::item {
 }
 
 """
+
+
+MOBILE_STYLE = """
+/* Android compact/touch UI overrides */
+
+QWidget {
+    font-size: 12px;
+}
+
+#pageTitle {
+    font-size: 20px;
+}
+
+#pageDescription {
+    font-size: 12px;
+}
+
+#cardTitle {
+    font-size: 16px;
+}
+
+#statusLabel {
+    font-size: 11px;
+}
+
+QCheckBox {
+    font-size: 12px;
+    min-width: 0px;
+    spacing: 7px;
+    color: #222222;
+}
+
+QCheckBox:checked {
+    color: #222222;
+}
+
+QLineEdit {
+    font-size: 12px;
+    padding: 7px 9px;
+    min-height: 20px;
+}
+
+QComboBox {
+    font-size: 12px;
+    padding: 6px 9px;
+    min-height: 22px;
+}
+
+QDoubleSpinBox {
+    font-size: 11px;
+    padding: 6px 8px;
+    min-height: 22px;
+}
+
+#primaryButton {
+    font-size: 13px;
+    padding: 9px 15px;
+    min-height: 24px;
+}
+
+#secondaryButton {
+    font-size: 12px;
+    padding: 8px 12px;
+    min-height: 22px;
+}
+
+QTextBrowser {
+    font-size: 11px;
+}
+
+QListWidget,
+QTableWidget {
+    font-size: 10px;
+}
+
+QListWidget::item {
+    padding: 7px;
+}
+
+QTabBar::tab {
+    font-size: 11px;
+    padding: 7px 10px;
+}
+
+#mobileNavTitle {
+    font-size: 15px;
+}
+
+#mobileNav QComboBox {
+    font-size: 13px;
+    min-width: 145px;
+    padding: 6px 8px;
+    background-color: #282d37;
+    color: #ffffff;
+}
+
+/* Android popup: never allow white text on white background. */
+QComboBox QAbstractItemView {
+    background-color: #ffffff;
+    color: #111827;
+    selection-background-color: #dbeafe;
+    selection-color: #111827;
+}
+
+QComboBox QAbstractItemView::item {
+    color: #111827;
+    background-color: #ffffff;
+    min-height: 34px;
+    padding: 5px 8px;
+}
+
+QComboBox QAbstractItemView::item:selected {
+    color: #111827;
+    background-color: #dbeafe;
+}
+
+#mobileNav QComboBox QAbstractItemView {
+    background-color: #ffffff;
+    color: #111827;
+    selection-background-color: #dbeafe;
+    selection-color: #111827;
+}
+
+#mobileNav QComboBox QAbstractItemView::item {
+    color: #111827;
+    background-color: #ffffff;
+}
+
+#mobileNav QComboBox QAbstractItemView::item:selected {
+    color: #111827;
+    background-color: #dbeafe;
+}
+"""
+
+
+def get_app_style() -> str:
+    from app.platform import is_android
+
+    if is_android():
+        return APP_STYLE + MOBILE_STYLE
+
+    return APP_STYLE

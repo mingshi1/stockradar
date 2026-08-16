@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 
-APP_VERSION = "1.0.0-rc4.13"
+APP_VERSION = "1.0.0-rc4.15"
 
 
 def _task_id_from_args() -> int | None:
@@ -164,6 +164,9 @@ def run_scheduled_task(
         [sys.argv[0]]
     )
     _set_app_metadata(app)
+    app.setStyleSheet(
+        get_app_style()
+    )
 
     config = AppConfig()
     database = Database()
@@ -210,11 +213,24 @@ def _run_gui() -> int:
     from app.ui.main_window import (
         MainWindow,
     )
+    from app.platform import (
+        is_android,
+        runtime_platform_info,
+    )
     from app.ui.onboarding import (
         FirstRunWizard,
+        MobileFirstRunDialog,
+    )
+    from app.ui.styles import (
+        get_app_style,
     )
 
     setup_logging()
+
+    print(
+        "Runtime platform:",
+        runtime_platform_info(),
+    )
 
     app = (
         QApplication.instance()
@@ -228,13 +244,22 @@ def _run_gui() -> int:
     )
 
     if not config.onboarding_complete:
-        wizard = FirstRunWizard(
-            config=config,
-            provider_manager=(
-                provider_manager
-            ),
-        )
-        wizard.exec()
+        if is_android():
+            onboarding = MobileFirstRunDialog(
+                config=config,
+                provider_manager=(
+                    provider_manager
+                ),
+            )
+            onboarding.exec()
+        else:
+            wizard = FirstRunWizard(
+                config=config,
+                provider_manager=(
+                    provider_manager
+                ),
+            )
+            wizard.exec()
 
     window = MainWindow(
         config=config,

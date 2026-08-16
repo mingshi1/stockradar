@@ -33,7 +33,7 @@ class HistoryPage(QWidget):
         layout.addWidget(title)
         layout.addWidget(description)
 
-        content = QHBoxLayout()
+        self.content_layout = QHBoxLayout()
 
         self.list_widget = QListWidget()
         self.list_widget.setMaximumWidth(360)
@@ -47,10 +47,43 @@ class HistoryPage(QWidget):
             "选择左侧历史记录查看完整报告。"
         )
 
-        content.addWidget(self.list_widget)
-        content.addWidget(self.browser, 1)
+        self.content_layout.addWidget(
+            self.list_widget
+        )
+        self.content_layout.addWidget(
+            self.browser,
+            1,
+        )
 
-        layout.addLayout(content, 1)
+        layout.addLayout(
+            self.content_layout,
+            1,
+        )
+
+    def set_mobile_mode(
+        self,
+        mobile: bool,
+    ):
+        if mobile:
+            self.content_layout.setDirection(
+                QHBoxLayout.Direction.TopToBottom
+            )
+            self.list_widget.setMaximumWidth(
+                16777215
+            )
+            self.list_widget.setMaximumHeight(
+                190
+            )
+        else:
+            self.content_layout.setDirection(
+                QHBoxLayout.Direction.LeftToRight
+            )
+            self.list_widget.setMaximumWidth(
+                360
+            )
+            self.list_widget.setMaximumHeight(
+                16777215
+            )
 
     def set_runs(self, runs: list[dict]):
         self.list_widget.clear()

@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 
 from app.ai.manager import ProviderManager
 from app.config.settings import AppConfig
+from app.platform import is_android
 
 
 class SettingsPage(QWidget):
@@ -97,24 +98,12 @@ class SettingsPage(QWidget):
             global_title
         )
 
-        row = QHBoxLayout()
-
-        row.addWidget(
-            QLabel("联网研究 Provider")
-        )
         self.research_combo = QComboBox()
         self.research_combo.addItems(
             self.provider_manager
             .research_provider_names()
         )
-        row.addWidget(
-            self.research_combo,
-            1,
-        )
 
-        row.addWidget(
-            QLabel("分析模式")
-        )
         self.mode_combo = QComboBox()
         self.mode_combo.addItem(
             "单模型快速",
@@ -124,24 +113,9 @@ class SettingsPage(QWidget):
             "多模型交叉验证",
             "multi",
         )
-        row.addWidget(
-            self.mode_combo,
-            1,
-        )
-
-        global_layout.addLayout(row)
-
-        judge_row = QHBoxLayout()
 
         self.judge_checkbox = QCheckBox(
             "启用 Judge AI 总结共识与分歧"
-        )
-        judge_row.addWidget(
-            self.judge_checkbox
-        )
-        judge_row.addStretch()
-        judge_row.addWidget(
-            QLabel("Judge Provider")
         )
 
         self.judge_combo = QComboBox()
@@ -149,13 +123,66 @@ class SettingsPage(QWidget):
             self.provider_manager
             .provider_names()
         )
-        judge_row.addWidget(
-            self.judge_combo
-        )
 
-        global_layout.addLayout(
-            judge_row
-        )
+        if is_android():
+            global_layout.addWidget(
+                QLabel("联网研究 Provider")
+            )
+            global_layout.addWidget(
+                self.research_combo
+            )
+            global_layout.addWidget(
+                QLabel("分析模式")
+            )
+            global_layout.addWidget(
+                self.mode_combo
+            )
+            global_layout.addWidget(
+                self.judge_checkbox
+            )
+            global_layout.addWidget(
+                QLabel("Judge Provider")
+            )
+            global_layout.addWidget(
+                self.judge_combo
+            )
+        else:
+            row = QHBoxLayout()
+
+            row.addWidget(
+                QLabel("联网研究 Provider")
+            )
+            row.addWidget(
+                self.research_combo,
+                1,
+            )
+            row.addWidget(
+                QLabel("分析模式")
+            )
+            row.addWidget(
+                self.mode_combo,
+                1,
+            )
+
+            global_layout.addLayout(
+                row
+            )
+
+            judge_row = QHBoxLayout()
+            judge_row.addWidget(
+                self.judge_checkbox
+            )
+            judge_row.addStretch()
+            judge_row.addWidget(
+                QLabel("Judge Provider")
+            )
+            judge_row.addWidget(
+                self.judge_combo
+            )
+
+            global_layout.addLayout(
+                judge_row
+            )
 
         hint = QLabel(
             "日常建议启用 2~3 个模型。当前版本 会记录每次 Provider 耗时和 Token；"
@@ -237,7 +264,10 @@ class SettingsPage(QWidget):
             "参与多模型独立分析"
         )
 
-        if info.supports_web_search:
+        if (
+            info.supports_web_search
+            and not is_android()
+        ):
             enabled.setText(
                 "参与多模型独立分析"
                 "（也可作为联网研究 Provider）"
@@ -272,7 +302,9 @@ class SettingsPage(QWidget):
         input_price.setDecimals(6)
         input_price.setSingleStep(0.1)
         input_price.setSuffix(
-            " / 1M input tokens"
+            " /1M"
+            if is_android()
+            else " / 1M input tokens"
         )
 
         output_price = QDoubleSpinBox()
@@ -283,59 +315,91 @@ class SettingsPage(QWidget):
         output_price.setDecimals(6)
         output_price.setSingleStep(0.1)
         output_price.setSuffix(
-            " / 1M output tokens"
+            " /1M"
+            if is_android()
+            else " / 1M output tokens"
         )
 
-        grid.addWidget(
-            QLabel("模型"),
-            0,
-            0,
-        )
-        grid.addWidget(
-            model_combo,
-            0,
-            1,
-        )
-        grid.addWidget(
-            QLabel("Base URL"),
-            1,
-            0,
-        )
-        grid.addWidget(
-            base_input,
-            1,
-            1,
-        )
-        grid.addWidget(
-            QLabel("API Key"),
-            2,
-            0,
-        )
-        grid.addWidget(
-            api_input,
-            2,
-            1,
-        )
-        grid.addWidget(
-            QLabel("输入单价*"),
-            3,
-            0,
-        )
-        grid.addWidget(
-            input_price,
-            3,
-            1,
-        )
-        grid.addWidget(
-            QLabel("输出单价*"),
-            4,
-            0,
-        )
-        grid.addWidget(
-            output_price,
-            4,
-            1,
-        )
+        if is_android():
+            rows = [
+                ("模型", model_combo),
+                ("Base URL", base_input),
+                ("API Key", api_input),
+                ("输入单价*", input_price),
+                ("输出单价*", output_price),
+            ]
+
+            grid.setColumnStretch(
+                0,
+                1,
+            )
+
+            for row_index, (
+                label_text,
+                widget,
+            ) in enumerate(rows):
+                label_row = row_index * 2
+                grid.addWidget(
+                    QLabel(label_text),
+                    label_row,
+                    0,
+                )
+                grid.addWidget(
+                    widget,
+                    label_row + 1,
+                    0,
+                )
+        else:
+            grid.addWidget(
+                QLabel("模型"),
+                0,
+                0,
+            )
+            grid.addWidget(
+                model_combo,
+                0,
+                1,
+            )
+            grid.addWidget(
+                QLabel("Base URL"),
+                1,
+                0,
+            )
+            grid.addWidget(
+                base_input,
+                1,
+                1,
+            )
+            grid.addWidget(
+                QLabel("API Key"),
+                2,
+                0,
+            )
+            grid.addWidget(
+                api_input,
+                2,
+                1,
+            )
+            grid.addWidget(
+                QLabel("输入单价*"),
+                3,
+                0,
+            )
+            grid.addWidget(
+                input_price,
+                3,
+                1,
+            )
+            grid.addWidget(
+                QLabel("输出单价*"),
+                4,
+                0,
+            )
+            grid.addWidget(
+                output_price,
+                4,
+                1,
+            )
 
         layout.addLayout(
             grid
