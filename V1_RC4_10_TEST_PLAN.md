@@ -1,85 +1,98 @@
-# V1.0.0 RC4.10 Android libffi 修复测试
+# V1.0.0 RC4.10 Android 测试
 
-## 完整日志中的真实根因
+## 已定位的真实 Buildozer 根因
 
-RC4.9 已经正确使用：
-
-```text
-hostpython3 3.11.15
-python3     3.11.15
-PySide6     6.11.1
-p4a         v2026.05.09
-```
-
-真正失败发生在：
+完整 `android-deploy.log`：
 
 ```text
-Building libffi for arm64-v8a
--> running autogen.sh
+RAN: .../libffi/autogen.sh
+
+configure.ac:215:
+error: possibly undefined macro: LT_SYS_SYMBOL_USCORE
+
+autoreconf:
+error: /usr/bin/autoconf failed with exit status: 1
 ```
 
-随后：
+因此失败发生在：
 
 ```text
-configure.ac:215: error:
-possibly undefined macro: LT_SYS_SYMBOL_USCORE
-
-autoreconf: error:
-/usr/bin/autoconf failed with exit status: 1
+python-for-android
+→ libffi recipe
+→ autogen.sh
+→ autoreconf
+→ autoconf
 ```
 
-因此问题是 Linux Runner 的 autotools/libltdl 构建前置依赖，
-不是应用 Python 代码，也不是 PySide6 wheel ABI。
+## 最新 prerequisite 截图里的 exit code 4
 
-## RC4.10 修复
+依赖安装已经完成。
 
-Runner 固定：
+真正导致该 GitHub step 红色的是：
 
-```text
-ubuntu-24.04
+```bash
+libtoolize --version | head -1
 ```
 
-Android CI 显式安装：
+配合：
 
-```text
-autoconf
-automake
-autopoint
-cmake
-gettext
-libffi-dev
-libltdl-dev
-libncurses5-dev
-libncursesw5-dev
-libssl-dev
-libtinfo6
-libtool
-libtool-bin
-m4
-pkg-config
-zlib1g-dev
-zip
-unzip
+```bash
+set -euo pipefail
 ```
 
-并在构建前检查：
+`head` 提前关闭 stdout 后，producer 收到 Broken pipe，
+使验证步骤错误退出。
 
-```text
-/usr/share/aclocal/ltdl.m4
-LT_SYS_SYMBOL_USCORE
+RC4.10 删除这种写法，直接执行：
+
+```bash
+autoconf --version
+automake --version
+aclocal --version
+libtoolize --version
+cmake --version
+pkg-config --version
 ```
 
-预期出现：
+## 本轮重点观察
+
+首先应该看到：
 
 ```text
 Install Android native build prerequisites
 ✓
-
-libltdl autoconf macro verification: OK
 ```
 
-之后 `Building libffi for arm64-v8a` 不应再因为
-`LT_SYS_SYMBOL_USCORE` 失败。
+然后：
+
+```text
+Setup Python 3.11
+✓
+...
+Build Android APK Beta
+```
+
+在 Build Android 日志中重点观察 libffi：
+
+之前：
+
+```text
+LT_SYS_SYMBOL_USCORE
+autoreconf ... exit status 1
+```
+
+RC4.10 目标是跨过这一段。
+
+## 如果仍失败
+
+RC4.9 起已经保存：
+
+```text
+android-deploy.log
+```
+
+失败后继续下载 diagnostics Artifact 即可，
+不需要再复制整个 GitHub 页面。
 
 ## 成功目标
 
@@ -92,11 +105,8 @@ Upload Android Beta
 ✓
 ```
 
-下载：
+Artifact：
 
 ```text
 StockEventRadar-Android-Beta-1.0.0-rc4.10
 ```
-
-如果出现下一处 native build 错误，继续使用
-`android-deploy.log` 定位第一处真实错误即可。

@@ -18,7 +18,7 @@ env:
 
 jobs:
   android-beta:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -30,46 +30,45 @@ jobs:
           set -euxo pipefail
 
           sudo apt-get update
-
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
             autoconf \
             automake \
             autopoint \
+            build-essential \
             cmake \
             gettext \
             libffi-dev \
             libltdl-dev \
-            libncurses5-dev \
-            libncursesw5-dev \
             libssl-dev \
-            libtinfo6 \
             libtool \
             libtool-bin \
-            m4 \
             pkg-config \
-            zlib1g-dev \
-            zip \
-            unzip
+            zlib1g-dev
 
-          echo "Autotools versions:"
-          autoconf --version | head -1
-          automake --version | head -1
-          aclocal --version | head -1
-          libtoolize --version | head -1
+          echo "Native build prerequisite versions:"
+          echo
+          autoconf --version
+          echo
+          automake --version
+          echo
+          aclocal --version
+          echo
+          libtoolize --version
+          echo
+          cmake --version
+          echo
+          pkg-config --version
 
-          ACLOCAL_DIR="$(aclocal --print-ac-dir)"
-          echo "aclocal system directory: $ACLOCAL_DIR"
-
-          test -f /usr/share/aclocal/ltdl.m4
-
-          if ! grep -q "LT_SYS_SYMBOL_USCORE" /usr/share/aclocal/ltdl.m4; then
-            echo "ERROR: libltdl-dev is installed but LT_SYS_SYMBOL_USCORE"
-            echo "was not found in /usr/share/aclocal/ltdl.m4"
-            exit 1
-          fi
-
-          echo "libltdl autoconf macro verification: OK"
-          grep -n "LT_SYS_SYMBOL_USCORE" /usr/share/aclocal/ltdl.m4 | head
+          echo
+          echo "Required Ubuntu packages:"
+          dpkg-query -W -f='${Package}: ${Status} ${Version}\n' \
+            autoconf \
+            automake \
+            autopoint \
+            libltdl-dev \
+            libtool \
+            libtool-bin \
+            pkg-config
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v6

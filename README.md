@@ -597,10 +597,11 @@ RC4.9 固定 p4a 正式 release、固定 cp311 target/hostpython，
 
 # V1.0.0 RC4.10
 
-完整 Android deploy 日志已经把真实失败定位到 libffi 的 autotools 阶段：
-`LT_SYS_SYMBOL_USCORE` 宏缺失。
+Android 完整日志已把真实失败定位到 python-for-android 的 libffi
+autotools 阶段：`LT_SYS_SYMBOL_USCORE` 宏不可用。
 
-RC4.10 固定 Ubuntu 24.04，并显式安装/验证 `libltdl-dev`
-及完整 native build prerequisites。
+RC4.10 在 Ubuntu Runner 中显式安装完整 native build prerequisites，
+包括 `libltdl-dev`，并修复 prerequisite 版本检查因
+`pipefail + head` 造成的 Broken pipe 误报。
 
 详见 `V1_RC4_10_TEST_PLAN.md`。

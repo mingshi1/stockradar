@@ -2,18 +2,29 @@
 
 ## 1.0.0-rc4.10
 
-### Android libffi / autotools prerequisite fix
-- 通过完整 `android-deploy.log` 定位到真实首个失败：
-  `libffi/autogen.sh`。
-- 具体错误：
-  `configure.ac:215: error: possibly undefined macro: LT_SYS_SYMBOL_USCORE`。
-- 不再修改 Python 3.11 / Qt 6.11.1 / p4a 版本组合。
-- GitHub Android Runner 固定为 `ubuntu-24.04`，减少 runner 漂移。
-- Android CI 在 Python/Qt 安装前显式安装 native build prerequisites：
-  autoconf、automake、autopoint、gettext、libtool、libtool-bin、
-  libltdl-dev、libffi-dev、pkg-config、m4、cmake、zlib/ssl/ncurses 等。
-- 特别验证 `/usr/share/aclocal/ltdl.m4` 存在。
-- 特别验证 `LT_SYS_SYMBOL_USCORE` 宏可在 `ltdl.m4` 中找到。
+### Android libffi / native prerequisites fix
+- 完整 `android-deploy.log` 已定位真实 Buildozer 根因：
+  p4a 的 `libffi/autogen.sh` 在 `autoreconf` 阶段失败。
+- 真实错误：
+  `possibly undefined macro: LT_SYS_SYMBOL_USCORE`。
+- GitHub Ubuntu Runner 在 Android 构建前显式安装 native prerequisites：
+  - autoconf
+  - automake
+  - autopoint
+  - build-essential
+  - cmake
+  - gettext
+  - libffi-dev
+  - libltdl-dev
+  - libssl-dev
+  - libtool
+  - libtool-bin
+  - pkg-config
+  - zlib1g-dev
+- 特别加入 `libltdl-dev`，解决 libffi autotools 宏依赖问题。
+- 修复 prerequisite 自检中的 `Broken pipe`：
+  不再使用 `libtoolize --version | head -1` 等 pipefail 易误报写法。
+- 版本检查改为直接执行完整 `--version`。
 - Android Artifact 更新为
   `StockEventRadar-Android-Beta-1.0.0-rc4.10`。
 
