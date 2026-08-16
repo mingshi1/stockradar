@@ -331,7 +331,7 @@ jobs:
       - name: Upload Android Beta
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Beta-1.0.0-rc4.10
+          name: StockEventRadar-Android-Beta-1.0.0-rc4.11
           if-no-files-found: error
           path: android-output/*
 
@@ -339,7 +339,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.10
+          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.11
           if-no-files-found: ignore
           include-hidden-files: true
           path: |

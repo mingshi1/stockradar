@@ -3,7 +3,9 @@ from dataclasses import dataclass
 import json
 import re
 
-from openai import OpenAI
+from typing import Any
+
+from app.platform import is_android
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,10 +44,31 @@ class AIProvider(ABC):
         api_key: str,
         base_url: str | None = None,
         timeout: float = 120.0,
-    ) -> OpenAI:
+    ) -> Any:
+        resolved_base_url = (
+            base_url
+            or self.info.default_base_url
+        ).rstrip("/")
+
+        if is_android():
+            from app.ai.android_client import (
+                AndroidOpenAICompat,
+            )
+
+            return AndroidOpenAICompat(
+                api_key=api_key,
+                base_url=resolved_base_url,
+                timeout=timeout,
+            )
+
+        # Desktop keeps using the official OpenAI-compatible SDK.
+        # The import is intentionally lazy so Android startup does
+        # not require the openai/httpx/pydantic dependency tree.
+        from openai import OpenAI
+
         return OpenAI(
             api_key=api_key,
-            base_url=(base_url or self.info.default_base_url).rstrip("/"),
+            base_url=resolved_base_url,
             timeout=timeout,
         )
 

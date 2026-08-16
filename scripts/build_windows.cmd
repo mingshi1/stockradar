@@ -4,7 +4,7 @@ setlocal
 cd /d "%~dp0\.."
 
 echo ==========================================
-echo StockEventRadar v1.0.0-rc4.10.1 Windows Build
+echo StockEventRadar v1.0.0-rc4.11.1 Windows Build
 echo ==========================================
 echo.
 echo Large TEMP, Nuitka and pip build caches will use:

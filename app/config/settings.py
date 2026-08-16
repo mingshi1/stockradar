@@ -6,7 +6,34 @@ from app.secrets import SecretStore
 
 
 APP_NAME = "StockEventRadar"
-APP_DATA_DIR = Path(os.getenv("APPDATA") or Path.home()) / APP_NAME
+
+
+def _app_data_dir() -> Path:
+    from app.platform import is_android
+
+    if is_android():
+        try:
+            from PySide6.QtCore import QStandardPaths
+
+            location = QStandardPaths.writableLocation(
+                QStandardPaths.StandardLocation.AppDataLocation
+            )
+
+            if location:
+                return Path(location)
+        except Exception:
+            pass
+
+    return (
+        Path(
+            os.getenv("APPDATA")
+            or Path.home()
+        )
+        / APP_NAME
+    )
+
+
+APP_DATA_DIR = _app_data_dir()
 CONFIG_FILE = APP_DATA_DIR / "settings.json"
 DATABASE_FILE = APP_DATA_DIR / "stockradar.db"
 

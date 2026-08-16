@@ -1,2 +1,3 @@
 PySide6==6.11.1
-openai>=1.82.0
+# Android runtime networking uses app.ai.android_client (stdlib urllib).
+# Do not add the desktop openai/httpx/pydantic dependency tree to the APK.

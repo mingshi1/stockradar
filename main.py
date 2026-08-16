@@ -1,20 +1,19 @@
+from __future__ import annotations
+
 import os
 import sys
+import traceback
 from pathlib import Path
 
+from PySide6.QtCore import QStandardPaths
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication
-
-from app.ai.manager import ProviderManager
-from app.automation.service import AutomationService
-from app.config.settings import AppConfig
-from app.database.database import Database
-from app.logging_setup import setup_logging
-from app.ui.main_window import MainWindow
-from app.ui.onboarding import FirstRunWizard
+from PySide6.QtWidgets import (
+    QApplication,
+    QMessageBox,
+)
 
 
-APP_VERSION = "1.0.0-rc4.10"
+APP_VERSION = "1.0.0-rc4.11"
 
 
 def _task_id_from_args() -> int | None:
@@ -65,11 +64,102 @@ def _set_app_metadata(
         )
 
 
+def _startup_log_path() -> Path:
+    try:
+        location = (
+            QStandardPaths.writableLocation(
+                QStandardPaths.StandardLocation.AppDataLocation
+            )
+        )
+
+        if location:
+            root = Path(location)
+        else:
+            root = Path.home() / "StockEventRadar"
+    except Exception:
+        root = Path.home() / "StockEventRadar"
+
+    root.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    return root / "startup_crash.log"
+
+
+def _record_startup_crash(
+    exc: BaseException,
+) -> str:
+    details = "".join(
+        traceback.format_exception(
+            type(exc),
+            exc,
+            exc.__traceback__,
+        )
+    )
+
+    try:
+        path = _startup_log_path()
+        path.write_text(
+            details,
+            encoding="utf-8",
+        )
+        return (
+            f"{details}\n\n"
+            f"Log: {path}"
+        )
+    except Exception:
+        return details
+
+
+def _show_startup_error(
+    details: str,
+):
+    try:
+        app = (
+            QApplication.instance()
+            or QApplication(sys.argv)
+        )
+        _set_app_metadata(app)
+
+        box = QMessageBox()
+        box.setIcon(
+            QMessageBox.Icon.Critical
+        )
+        box.setWindowTitle(
+            "AI板块事件雷达启动失败"
+        )
+        box.setText(
+            "应用启动时发生错误。"
+        )
+        box.setInformativeText(
+            "RC4.11 已记录详细错误，"
+            "请把这个提示截图发给开发者。"
+        )
+        box.setDetailedText(
+            details[-6000:]
+        )
+        box.exec()
+    except Exception:
+        pass
+
+
 def run_scheduled_task(
     task_id: int,
 ) -> int:
-    # No main window is shown. QApplication remains available for
-    # Qt PDF generation used by the automatic report exporter.
+    from app.ai.manager import (
+        ProviderManager,
+    )
+    from app.automation.service import (
+        AutomationService,
+    )
+    from app.config.settings import (
+        AppConfig,
+    )
+    from app.database.database import (
+        Database,
+    )
+
     app = QApplication(
         [sys.argv[0]]
     )
@@ -104,19 +194,32 @@ def run_scheduled_task(
     return 0
 
 
-def main():
+def _run_gui() -> int:
+    # Imports are intentionally deferred until startup error handling
+    # is active. This is especially useful on Android where missing
+    # packaged Python dependencies otherwise look like an instant crash.
+    from app.ai.manager import (
+        ProviderManager,
+    )
+    from app.config.settings import (
+        AppConfig,
+    )
+    from app.logging_setup import (
+        setup_logging,
+    )
+    from app.ui.main_window import (
+        MainWindow,
+    )
+    from app.ui.onboarding import (
+        FirstRunWizard,
+    )
+
     setup_logging()
 
-    task_id = _task_id_from_args()
-
-    if task_id is not None:
-        raise SystemExit(
-            run_scheduled_task(
-                task_id
-            )
-        )
-
-    app = QApplication(sys.argv)
+    app = (
+        QApplication.instance()
+        or QApplication(sys.argv)
+    )
     _set_app_metadata(app)
 
     config = AppConfig()
@@ -141,7 +244,43 @@ def main():
     )
     window.show()
 
-    sys.exit(app.exec())
+    return app.exec()
+
+
+def main():
+    try:
+        task_id = _task_id_from_args()
+
+        if task_id is not None:
+            raise SystemExit(
+                run_scheduled_task(
+                    task_id
+                )
+            )
+
+        raise SystemExit(
+            _run_gui()
+        )
+
+    except SystemExit:
+        raise
+    except BaseException as exc:
+        details = (
+            _record_startup_crash(
+                exc
+            )
+        )
+
+        print(
+            details,
+            file=sys.stderr,
+        )
+
+        _show_startup_error(
+            details
+        )
+
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

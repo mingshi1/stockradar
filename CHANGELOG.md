@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.0-rc4.11
+
+### Android first-launch crash hotfix
+- Android APK 已成功生成并可安装，但荣耀手机首次启动立即闪退。
+- 修复 Android 启动时对桌面 `openai` SDK 的顶层硬依赖。
+- Desktop 继续使用官方 OpenAI-compatible Python SDK。
+- Android 改用标准库 `urllib` 实现轻量 OpenAI-compatible HTTP client：
+  - `/chat/completions`
+  - `/responses`
+- Android APK 不再需要打包 `openai/httpx/pydantic` 依赖树。
+- Android AppData 改用 Qt `QStandardPaths.AppDataLocation`。
+- `main.py` 延迟导入应用模块，并增加启动异常捕获。
+- 若仍发生 Python 层启动错误，RC4.11 会尝试弹出“启动失败”对话框，
+  同时写入 `startup_crash.log`，避免只有无信息闪退。
+- Android Artifact 更新为
+  `StockEventRadar-Android-Beta-1.0.0-rc4.11`。
+
 ## 1.0.0-rc4.10
 
 ### Android libffi / native prerequisites fix
