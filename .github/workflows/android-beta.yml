@@ -305,35 +305,35 @@ jobs:
             "$PWD/android-wheels/${PYSIDE_ANDROID_WHEEL_FILENAME}" \
             "$PWD/android-wheels/${SHIBOKEN_ANDROID_WHEEL_FILENAME}"
 
-- name: Validate single Android APK
-  shell: bash
-  run: |
-    set -euxo pipefail
+      - name: Validate single Android APK
+        shell: bash
+        run: |
+          set -euxo pipefail
 
-    ls -lah android-output
+          ls -lah android-output
 
-    test -s \
-      android-output/StockEventRadar-Android-arm64-v8a-debug.apk
+          test -s \
+            android-output/StockEventRadar-Android-arm64-v8a-debug.apk
 
-    APK_COUNT="$(
-      find android-output \
-        -maxdepth 1 \
-        -type f \
-        -iname "*.apk" \
-        | wc -l
-    )"
+          APK_COUNT="$(
+            find android-output \
+              -maxdepth 1 \
+              -type f \
+              -iname "*.apk" \
+              | wc -l
+          )"
 
-    echo "APK count: $APK_COUNT"
+          echo "APK count: $APK_COUNT"
 
-    if [ "$APK_COUNT" -ne 1 ]; then
-      echo "Expected exactly one APK artifact."
-      exit 1
-    fi
+          if [ "$APK_COUNT" -ne 1 ]; then
+            echo "Expected exactly one APK artifact."
+            exit 1
+          fi
 
       - name: Upload Android Beta
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Beta-1.0.0-rc4.12
+          name: StockEventRadar-Android-Beta-1.0.0-rc4.13
           if-no-files-found: error
           path: android-output/StockEventRadar-Android-arm64-v8a-debug.apk
 
@@ -341,7 +341,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.12
+          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.13
           if-no-files-found: ignore
           include-hidden-files: true
           path: |
@@ -354,9 +354,3 @@ jobs:
             android-output/**
             android-deploy.log
             .android-apks-found.txt
-            buildozer.spec
-            .android-artifacts-found.txt
-            .android-build-start
-            .android-artifacts-found.txt
-            .android-build-start
-            pysidedeploy.spec

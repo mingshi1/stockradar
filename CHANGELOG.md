@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.0-rc4.13
+
+### GitHub Actions YAML hotfix
+- 修复 RC4.12 `.github/workflows/android-beta.yml` 的 YAML 缩进错误。
+- `Validate single Android APK` 恢复为 `steps` 下的合法同级步骤。
+- RC4.12 的 0 秒失败发生在 GitHub workflow 解析阶段，
+  Android 构建本身根本没有开始。
+- 保留“只上传一个 APK”的 RC4.12 设计。
+- 清理 diagnostics path 中重复条目。
+- Android Artifact：
+  `StockEventRadar-Android-Beta-1.0.0-rc4.13`。
+
 ## 1.0.0-rc4.12
 
 ### Android single-APK test build
