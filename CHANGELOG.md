@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.0-rc4.8
+
+### Android wheel validation hotfix
+- RC4.7 在真正构建开始前被我们自己的 wheel 文件名检查误拦截。
+- Qt 官方 wheel URL 本身包含：
+  `cp311-cp311-android_aarch64`，
+  但之前 workflow 下载时人为缩短文件名，导致本地文件名丢失 `cp311`。
+- RC4.8 保留 Qt 官方原始 wheel 文件名。
+- 移除 bash 字符串通配符校验。
+- 使用 `packaging.utils.parse_wheel_filename()` 解析 wheel 文件名，
+  明确验证：
+  - interpreter = cp311
+  - abi = cp311
+  - platform = android_aarch64
+- Android Artifact 更新为
+  `StockEventRadar-Android-Beta-1.0.0-rc4.8`。
+
 ## 1.0.0-rc4.7
 
 ### Android Python ABI fix

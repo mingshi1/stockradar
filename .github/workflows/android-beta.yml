@@ -10,6 +10,8 @@ env:
   QT_FOR_PYTHON_VERSION: "6.11.1"
   QT_FOR_PYTHON_BRANCH: "6.11"
   ANDROID_PYTHON_VERSION: "3.11.15"
+  PYSIDE_ANDROID_WHEEL_FILENAME: "pyside6-6.11.1-6.11.1-cp311-cp311-android_aarch64.whl"
+  SHIBOKEN_ANDROID_WHEEL_FILENAME: "shiboken6-6.11.1-6.11.1-cp311-cp311-android_aarch64.whl"
   PYSIDE_ANDROID_WHEEL_URL: "https://download.qt.io/official_releases/QtForPython/pyside6/pyside6-6.11.1-6.11.1-cp311-cp311-android_aarch64.whl"
   SHIBOKEN_ANDROID_WHEEL_URL: "https://download.qt.io/official_releases/QtForPython/shiboken6/shiboken6-6.11.1-6.11.1-cp311-cp311-android_aarch64.whl"
 
@@ -111,16 +113,16 @@ jobs:
 
           curl --fail --location --retry 3 \
             "$PYSIDE_ANDROID_WHEEL_URL" \
-            -o "android-wheels/pyside6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
+            -o "android-wheels/${PYSIDE_ANDROID_WHEEL_FILENAME}"
 
           curl --fail --location --retry 3 \
             "$SHIBOKEN_ANDROID_WHEEL_URL" \
-            -o "android-wheels/shiboken6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
+            -o "android-wheels/${SHIBOKEN_ANDROID_WHEEL_FILENAME}"
 
           ls -lh android-wheels
 
-          test -s "android-wheels/pyside6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
-          test -s "android-wheels/shiboken6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
+          test -s "android-wheels/${PYSIDE_ANDROID_WHEEL_FILENAME}"
+          test -s "android-wheels/${SHIBOKEN_ANDROID_WHEEL_FILENAME}"
 
       - name: Clone matching Qt for Python tools outside app project
         shell: bash
@@ -225,8 +227,8 @@ jobs:
           chmod +x scripts/build_android.sh
 
           ./scripts/build_android.sh \
-            "$PWD/android-wheels/pyside6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl" \
-            "$PWD/android-wheels/shiboken6-${QT_FOR_PYTHON_VERSION}-android_aarch64.whl"
+            "$PWD/android-wheels/${PYSIDE_ANDROID_WHEEL_FILENAME}" \
+            "$PWD/android-wheels/${SHIBOKEN_ANDROID_WHEEL_FILENAME}"
 
       - name: Validate collected APK/AAB
         shell: bash
@@ -254,7 +256,7 @@ jobs:
       - name: Upload Android Beta
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Beta-1.0.0-rc4.7
+          name: StockEventRadar-Android-Beta-1.0.0-rc4.8
           if-no-files-found: error
           path: android-output/*
 
@@ -262,7 +264,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.7
+          name: StockEventRadar-Android-Diagnostics-1.0.0-rc4.8
           if-no-files-found: ignore
           include-hidden-files: true
           path: |

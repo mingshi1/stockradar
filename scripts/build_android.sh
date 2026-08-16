@@ -54,21 +54,61 @@ echo
 echo "Android wheels:"
 ls -lh "$PYSIDE_WHEEL" "$SHIBOKEN_WHEEL"
 
-case "$(basename "$PYSIDE_WHEEL")" in
-  *cp311*android_aarch64.whl) ;;
-  *)
-    echo "ERROR: PySide Android wheel is not the expected cp311 aarch64 wheel."
-    exit 10
-    ;;
-esac
+echo
+echo "Validating Android wheel ABI/platform metadata..."
 
-case "$(basename "$SHIBOKEN_WHEEL")" in
-  *cp311*android_aarch64.whl) ;;
-  *)
-    echo "ERROR: Shiboken Android wheel is not the expected cp311 aarch64 wheel."
-    exit 11
-    ;;
-esac
+python - "$PYSIDE_WHEEL" "$SHIBOKEN_WHEEL" <<'PY'
+from pathlib import Path
+from packaging.utils import parse_wheel_filename
+import sys
+
+expected = {
+    "pyside6": "pyside6",
+    "shiboken6": "shiboken6",
+}
+
+for raw_path in sys.argv[1:]:
+    path = Path(raw_path)
+
+    if not path.is_file():
+        raise SystemExit(f"Wheel does not exist: {path}")
+
+    try:
+        name, version, build, tags = parse_wheel_filename(path.name)
+    except Exception as exc:
+        raise SystemExit(
+            f"Invalid wheel filename {path.name!r}: {exc}"
+        ) from exc
+
+    normalized = str(name).replace("-", "_").lower()
+
+    matching = [
+        tag
+        for tag in tags
+        if (
+            tag.interpreter == "cp311"
+            and tag.abi == "cp311"
+            and tag.platform == "android_aarch64"
+        )
+    ]
+
+    print(
+        f"{path.name}: name={name}, version={version}, "
+        f"build={build}, tags={sorted(map(str, tags))}"
+    )
+
+    if normalized not in expected:
+        raise SystemExit(
+            f"Unexpected Android wheel distribution: {name}"
+        )
+
+    if not matching:
+        raise SystemExit(
+            f"{path.name} is not a cp311/cp311 android_aarch64 wheel."
+        )
+
+print("Android wheel ABI/platform validation: OK")
+PY
 
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
