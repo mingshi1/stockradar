@@ -1,4 +1,4 @@
-# AI板块事件雷达 v1.0.0-rc4.27
+# AI板块事件雷达 v1.0.0-rc4.28
 
 V0.9 的主题是：
 
@@ -175,8 +175,8 @@ Windows 可以：
 或者：
 
 ```text
-git tag v1.0.0-rc4.27
-git push origin v1.0.0-rc4.27
+git tag v1.0.0-rc4.28
+git push origin v1.0.0-rc4.28
 ```
 
 触发 Release 构建。

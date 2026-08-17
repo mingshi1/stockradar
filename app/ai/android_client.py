@@ -313,97 +313,137 @@ class _HttpTransport:
             timeout=self.timeout,
             context=self.ssl_context,
         ) as response:
-            event_name = ""
-            data_lines: list[str] = []
-            terminal_seen = False
+            yield from self._iter_sse_response(
+                response
+            )
 
-            while True:
-                raw_line = response.readline()
+    def _iter_sse_response(
+        self,
+        response,
+    ):
+        """
+        Parse one SSE HTTP response.
 
-                if not raw_line:
-                    if data_lines:
-                        data = "\n".join(
-                            data_lines
-                        )
-                        item = self._decode_sse_item(
-                            data,
-                            event_name,
-                        )
-                        if item is not None:
-                            yield item
+        Some servers close immediately after the final SSE record without
+        appending an extra blank line. The buffered final record must be
+        dispatched before deciding that EOF was premature.
+        """
+        event_name = ""
+        data_lines: list[str] = []
+        terminal_seen = False
+        event_count = 0
+        last_event_type = ""
 
-                    if terminal_seen:
-                        return
+        def dispatch_buffered():
+            nonlocal event_name
+            nonlocal data_lines
+            nonlocal terminal_seen
+            nonlocal event_count
+            nonlocal last_event_type
 
-                    raise RuntimeError(
-                        "Android SSE 流在完成标记前被关闭。"
-                    )
-
-                line = raw_line.decode(
-                    "utf-8",
-                    errors="replace",
-                ).rstrip(
-                    "\r\n"
-                )
-
-                if line.startswith(":"):
-                    continue
-
-                if line.startswith("event:"):
-                    event_name = (
-                        line[6:].strip()
-                    )
-                    continue
-
-                if line.startswith("data:"):
-                    data_lines.append(
-                        line[5:].lstrip()
-                    )
-                    continue
-
-                if line:
-                    data_lines.append(line)
-                    continue
-
-                if not data_lines:
-                    event_name = ""
-                    continue
-
-                data = "\n".join(
-                    data_lines
-                )
-                data_lines = []
-
-                if data.strip() == "[DONE]":
-                    terminal_seen = True
-                    return
-
-                item = self._decode_sse_item(
-                    data,
-                    event_name,
-                )
+            if not data_lines:
                 event_name = ""
+                return None
 
-                if item is None:
-                    continue
+            data = "\n".join(
+                data_lines
+            )
+            data_lines = []
 
-                item_type = str(
-                    item.get("type")
-                    or item.get("event")
-                    or ""
-                )
+            if data.strip() == "[DONE]":
+                terminal_seen = True
+                event_name = ""
+                return "__DONE__"
 
-                if item_type in {
-                    "response.completed",
-                    "response.incomplete",
-                    "response.failed",
-                }:
-                    terminal_seen = True
+            item = self._decode_sse_item(
+                data,
+                event_name,
+            )
+            event_name = ""
 
-                yield item
+            if item is None:
+                return None
+
+            item_type = str(
+                item.get("type")
+                or item.get("event")
+                or ""
+            )
+            event_count += 1
+
+            if item_type:
+                last_event_type = item_type
+
+            if item_type in {
+                "response.completed",
+                "response.incomplete",
+                "response.failed",
+            }:
+                terminal_seen = True
+
+            return item
+
+        while True:
+            raw_line = response.readline()
+
+            if not raw_line:
+                # RC4.27 bug: the buffered final record was yielded, but its
+                # terminal type was not applied before the EOF check.
+                item = dispatch_buffered()
+
+                if (
+                    item is not None
+                    and item != "__DONE__"
+                ):
+                    yield item
 
                 if terminal_seen:
                     return
+
+                raise RuntimeError(
+                    "Android SSE 流在完成标记前被关闭。"
+                    f"已收到 {event_count} 个事件；"
+                    f"最后事件：{last_event_type or '无'}。"
+                )
+
+            line = raw_line.decode(
+                "utf-8",
+                errors="replace",
+            ).rstrip(
+                "\r\n"
+            )
+
+            if line.startswith(":"):
+                # DeepSeek SSE keep-alive comment.
+                continue
+
+            if line.startswith("event:"):
+                event_name = (
+                    line[6:].strip()
+                )
+                continue
+
+            if line.startswith("data:"):
+                data_lines.append(
+                    line[5:].lstrip()
+                )
+                continue
+
+            if line:
+                # Tolerate OpenAI-compatible servers emitting raw JSON lines.
+                data_lines.append(line)
+                continue
+
+            item = dispatch_buffered()
+
+            if item == "__DONE__":
+                return
+
+            if item is not None:
+                yield item
+
+            if terminal_seen:
+                return
 
     @staticmethod
     def _decode_sse_item(

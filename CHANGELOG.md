@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0-rc4.28
+
+### Android SSE 结束帧修复
+- 修复 RC4.27 Android SSE 解析器的 EOF 边界错误：最终 `response.completed` 若紧接 HTTP EOF、没有额外空行，会被误判为“完成标记前关闭”。
+- 同时修复 Chat Completions 最终 `data: [DONE]` 紧接 EOF 时的同类问题。
+- 真正提前断流时，错误会显示已收到的 SSE 事件数和最后事件类型。
+- Windows 继续使用官方 SDK 的 SSE 解析，不受这个 Android 自研解析器边界错误影响。
+- 保留 RC4.27 跨平台流式请求和此前 Android 自动任务保存修复。
+
+
 ## 1.0.0-rc4.27
 
 ### Android + Windows 长请求流式化
