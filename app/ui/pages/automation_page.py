@@ -289,7 +289,14 @@ class AutomationPage(QWidget):
             self._choose_report_directory
         )
 
-        report_dir_row = QWidget()
+        # Keep this container parented even on Android.
+        #
+        # Android intentionally does not add the report-directory row to the
+        # form.  If the row has no parent, the local QWidget wrapper can be
+        # destroyed when this method returns, which also deletes its child
+        # QLineEdit.  self.report_directory would then point at an already
+        # deleted C++ object and saving a task raises a libshiboken error.
+        report_dir_row = QWidget(group)
         report_dir_layout = (
             QVBoxLayout(
                 report_dir_row
@@ -346,6 +353,10 @@ class AutomationPage(QWidget):
                 "报告保存目录",
                 report_dir_row,
             )
+        else:
+            # It remains a child of the group solely to keep the hidden
+            # report-directory controls alive for payload/load/clear code.
+            report_dir_row.hide()
 
         buttons = (
             QGridLayout()
