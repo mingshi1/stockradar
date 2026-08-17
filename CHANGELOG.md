@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.0-rc4.26
+
+### Android 长请求稳定性
+- 独立 AI 分析在 Android 上的网络等待时间由 120 秒提高到 360 秒。
+- DeepSeek 联网研究在 Android 上的网络等待时间提高到 420 秒。
+- 完整等待超时后不再把同一个多分钟模型请求整单重跑，避免出现约 2 倍等待时间和潜在重复 API 消耗。
+- 对真正的连接重置、远端断开和 IncompleteRead 仍保留 1 次自动重试。
+- 精简联网研究与结构化分析提示词，减少重复输出，降低移动端长响应概率。
+
+### Android 自动任务
+- 保留 RC4.24 移动端“保存任务”QLineEdit 生命周期修复，隐藏的报告目录控件在 Android 上不再被 Qt 提前销毁。
+
+
 ## 1.0.0-rc4.24
 
 ### Harden Android scheduled-task save

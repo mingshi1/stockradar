@@ -349,11 +349,31 @@ class _HttpTransport:
                         f"\n\n详细信息：{reason}"
                     ) from exc
 
-                transient = isinstance(
+                # A read timeout after several minutes is not the same as
+                # an immediate connection reset. Retrying the whole model
+                # inference doubles waiting time and can duplicate API
+                # usage, so long read timeouts fail once with a clear
+                # message. Real connection truncations still get one retry.
+                if isinstance(
                     reason,
                     (
                         socket.timeout,
                         TimeoutError,
+                    ),
+                ):
+                    raise RuntimeError(
+                        "Android 等待模型响应超时。"
+                        f"本次已等待约 {int(self.timeout)} 秒。"
+                        "这通常表示模型生成或联网搜索时间较长，"
+                        "或移动网络在长连接期间没有持续收到数据。"
+                        "\n\n建议：保持应用在前台并使用稳定 Wi-Fi；"
+                        "RC4.26 已显著延长 Android 长请求等待时间。"
+                        f"\n\n详细信息：{reason}"
+                    ) from exc
+
+                transient = isinstance(
+                    reason,
+                    (
                         ConnectionResetError,
                         http.client.RemoteDisconnected,
                     ),
@@ -380,10 +400,22 @@ class _HttpTransport:
                 ) from exc
 
             except (
-                http.client.IncompleteRead,
-                http.client.RemoteDisconnected,
                 socket.timeout,
                 TimeoutError,
+            ) as exc:
+                raise RuntimeError(
+                    "Android 等待模型响应超时。"
+                    f"本次已等待约 {int(self.timeout)} 秒。"
+                    "这通常表示模型生成或联网搜索时间较长，"
+                    "或移动网络在长连接期间没有持续收到数据。"
+                    "\n\n建议：保持应用在前台并使用稳定 Wi-Fi；"
+                    "RC4.26 已显著延长 Android 长请求等待时间。"
+                    f"\n\n详细信息：{exc}"
+                ) from exc
+
+            except (
+                http.client.IncompleteRead,
+                http.client.RemoteDisconnected,
                 ConnectionResetError,
             ) as exc:
                 if attempt < max_attempts:
@@ -400,7 +432,7 @@ class _HttpTransport:
                     continue
 
                 raise RuntimeError(
-                    "Android 联网响应被中途截断，"
+                    "Android 联网连接被中途关闭，"
                     "已自动重试 1 次仍未完成。"
                     "这通常是长请求在移动网络链路中被提前关闭。"
                     f"\n\n详细信息：{exc}"

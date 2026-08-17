@@ -120,9 +120,20 @@ class AIProvider(ABC):
         system_prompt: str,
         user_prompt: str,
     ) -> JsonCallResult:
+        # Long reasoning / JSON generation can legitimately take
+        # well over two minutes on Android.  The old 120 s socket read
+        # timeout caused two back-to-back timeouts (~242 s total) before
+        # the provider had a chance to return the completed response.
+        analysis_timeout = (
+            360.0
+            if is_android()
+            else 120.0
+        )
+
         client = self.build_client(
             api_key=api_key,
             base_url=base_url,
+            timeout=analysis_timeout,
         )
 
         try:

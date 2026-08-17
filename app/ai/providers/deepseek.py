@@ -3,6 +3,7 @@ from app.ai.base import (
     ProviderInfo,
     TextCallResult,
 )
+from app.platform import is_android
 
 
 class DeepSeekProvider(AIProvider):
@@ -25,10 +26,16 @@ class DeepSeekProvider(AIProvider):
         prompt: str,
         instructions: str,
     ) -> TextCallResult:
+        research_timeout = (
+            420.0
+            if is_android()
+            else 180.0
+        )
+
         client = self.build_client(
             api_key=api_key,
             base_url=base_url,
-            timeout=180.0,
+            timeout=research_timeout,
         )
 
         try:
