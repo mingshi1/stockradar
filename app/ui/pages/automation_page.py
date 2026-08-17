@@ -413,40 +413,47 @@ class AutomationPage(QWidget):
             success=None,
         )
 
-        name = self.task_name.text().strip()
-        sectors = self._parse_sectors(
-            self.sectors_edit.toPlainText()
-        )
+        try:
+            name = self.task_name.text().strip()
+            sectors = self._parse_sectors(
+                self.sectors_edit.toPlainText()
+            )
 
-        payload = {
-            "id": self._selected_task_id,
-            "name": name or "每日任务",
-            "enabled": (
-                self.task_enabled.isChecked()
-            ),
-            "run_time": (
-                self.run_time.time().toString(
-                    "HH:mm"
-                )
-            ),
-            "sectors": sectors,
-            "analysis_mode": (
-                self.analysis_mode.currentData()
-            ),
-            "report_type": (
-                self.report_type.currentData()
-            ),
-            "generate_pdf": (
-                self.generate_pdf.isChecked()
-            ),
-            "report_directory": (
-                self.report_directory.text().strip()
-            ),
-        }
+            payload = {
+                "id": self._selected_task_id,
+                "name": name or "每日任务",
+                "enabled": (
+                    self.task_enabled.isChecked()
+                ),
+                "run_time": (
+                    self.run_time.time().toString(
+                        "HH:mm"
+                    )
+                ),
+                "sectors": sectors,
+                "analysis_mode": (
+                    self.analysis_mode.currentData()
+                ),
+                "report_type": (
+                    self.report_type.currentData()
+                ),
+                "generate_pdf": (
+                    self.generate_pdf.isChecked()
+                ),
+                "report_directory": (
+                    self.report_directory.text().strip()
+                ),
+            }
 
-        self.save_task_requested.emit(
-            payload
-        )
+            self.save_task_requested.emit(
+                payload
+            )
+
+        except Exception as exc:
+            self.set_save_feedback(
+                f"保存前读取配置失败：{exc}",
+                success=False,
+            )
 
     def _choose_report_directory(
         self,
@@ -684,6 +691,46 @@ class AutomationPage(QWidget):
         )
 
         self.layout.addWidget(group)
+
+    def mark_task_saved(
+        self,
+        task_id: int,
+    ):
+        self._selected_task_id = int(
+            task_id
+        )
+
+    def select_task_id(
+        self,
+        task_id: int,
+    ):
+        target = int(
+            task_id
+        )
+
+        for row in range(
+            self.task_table.rowCount()
+        ):
+            item = self.task_table.item(
+                row,
+                0,
+            )
+
+            if item is None:
+                continue
+
+            try:
+                current = int(
+                    item.text()
+                )
+            except Exception:
+                continue
+
+            if current == target:
+                self.task_table.selectRow(
+                    row
+                )
+                return
 
     def set_tasks(
         self,

@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.0.0-rc4.24
+
+### Harden Android scheduled-task save
+- RC4.23 真机出现“正在保存任务…”永久停留。
+- 已验证同版 `Database.save_scheduled_task()` 可独立完成：
+  SQLite 新建、读取、更新。
+- Android 保存流程改为严格两阶段：
+  1. 先完成 SQLite commit
+  2. 再独立刷新任务列表
+- 数据库 commit 后立即显示：
+  `✓ 任务 #N 已保存到本机`
+- 成功提示发生在列表刷新之前，因此列表 UI 即使异常，
+  也不会继续停留在“正在保存任务…”。
+- Android 保存后只刷新 scheduled_tasks 列表，
+  不再连带刷新运行历史表。
+- 列表刷新失败会明确显示：
+  `任务已保存；列表刷新失败，请点刷新或切换页面后再看`
+- `_emit_save_task()` payload 读取增加 try/except，
+  读取控件异常不再被 Qt 静默吞掉。
+- 保存后记住 task_id 并自动重新选中，
+  下一次保存更新同一条任务。
+- 新增 SQLite 保存/更新回归测试，并加入 Android CI。
+- 5 分钟联网失败单次重试、触屏滚动、移动布局继续保留。
+
 ## 1.0.0-rc4.23
 
 ### Fix Android “保存任务”无反馈

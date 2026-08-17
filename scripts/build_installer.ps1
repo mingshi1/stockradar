@@ -41,7 +41,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup failed with exit code $LASTEXITCODE"
 }
 
-$SetupExe = Join-Path $ProjectRoot "installer\output\StockEventRadar-Setup-1.0.0-rc4.23.exe"
+$SetupExe = Join-Path $ProjectRoot "installer\output\StockEventRadar-Setup-1.0.0-rc4.24.exe"
 
 if (-not (Test-Path $SetupExe)) {
     throw "Installer command completed but setup EXE was not found: $SetupExe"

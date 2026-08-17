@@ -456,7 +456,7 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         version = QLabel(
-            "v1.0.0 RC4.23"
+            "v1.0.0 RC4.24"
         )
         version.setObjectName(
             "versionLabel"
@@ -1384,6 +1384,10 @@ class MainWindow(QMainWindow):
         self,
         payload: dict,
     ):
+        self.logger.info(
+            "Scheduled task save stage: received"
+        )
+
         sectors = payload.get(
             "sectors",
             [],
@@ -1407,15 +1411,30 @@ class MainWindow(QMainWindow):
             return
 
         try:
+            self.logger.info(
+                "Scheduled task save stage: database write"
+            )
+
             task_id = (
                 self.database
                 .save_scheduled_task(
                     payload
                 )
             )
+
+            self.logger.info(
+                "Scheduled task save stage: database committed "
+                "| task_id=%s",
+                task_id,
+            )
+
         except Exception as exc:
             message = str(
                 exc
+            )
+
+            self.logger.exception(
+                "Scheduled task database save failed"
             )
 
             self.automation_page.set_save_feedback(
@@ -1430,12 +1449,12 @@ class MainWindow(QMainWindow):
             )
             return
 
-        # Android beta currently has no reliable system-level scheduler.
-        # Saving a task must therefore be a normal local SQLite action and
-        # must never be treated as a Windows Task Scheduler failure.
-        if is_android():
-            self.refresh_automation_views()
+        # At this point SQLite commit has already completed.
+        self.automation_page.mark_task_saved(
+            task_id
+        )
 
+        if is_android():
             state_text = (
                 "已启用"
                 if payload.get(
@@ -1444,29 +1463,53 @@ class MainWindow(QMainWindow):
                 else "已停用"
             )
 
+            # Show success before touching any table widgets.
             self.automation_page.set_save_feedback(
                 (
                     f"✓ 任务 #{task_id} 已保存到本机。"
                     f" 当前状态：{state_text}。"
-                    "可使用“立即执行”测试；"
-                    "Android 系统级后台调度尚未启用。"
                 ),
                 success=True,
             )
 
-            self.logger.info(
-                "Android scheduled task saved locally "
-                "| task_id=%s enabled=%s",
-                task_id,
-                bool(
-                    payload.get(
-                        "enabled"
-                    )
-                ),
-            )
+            try:
+                self.logger.info(
+                    "Scheduled task save stage: Android list refresh"
+                )
+
+                tasks = (
+                    self.database
+                    .list_scheduled_tasks()
+                )
+
+                self.automation_page.set_tasks(
+                    tasks
+                )
+                self.automation_page.select_task_id(
+                    task_id
+                )
+
+                self.logger.info(
+                    "Scheduled task save stage: Android list refreshed "
+                    "| task_id=%s",
+                    task_id,
+                )
+
+            except Exception:
+                self.logger.exception(
+                    "Task was saved, but Android task list refresh failed"
+                )
+
+                self.automation_page.set_save_feedback(
+                    (
+                        f"✓ 任务 #{task_id} 已保存到本机；"
+                        "列表刷新失败，请点“刷新”或切换页面后再看。"
+                    ),
+                    success=True,
+                )
+
             return
 
-        # Desktop Windows keeps the original system scheduler behavior.
         if payload.get(
             "enabled"
         ):
@@ -1490,7 +1533,15 @@ class MainWindow(QMainWindow):
                 )
             )
 
-        self.refresh_automation_views()
+        try:
+            self.refresh_automation_views()
+            self.automation_page.select_task_id(
+                task_id
+            )
+        except Exception:
+            self.logger.exception(
+                "Task saved but automation view refresh failed"
+            )
 
         if success:
             self.automation_page.set_save_feedback(
