@@ -120,15 +120,10 @@ class AIProvider(ABC):
         system_prompt: str,
         user_prompt: str,
     ) -> JsonCallResult:
-        # Long reasoning / JSON generation can legitimately take
-        # well over two minutes on Android.  The old 120 s socket read
-        # timeout caused two back-to-back timeouts (~242 s total) before
-        # the provider had a chance to return the completed response.
-        analysis_timeout = (
-            360.0
-            if is_android()
-            else 120.0
-        )
+        # RC4.27 uses SSE streaming on both desktop and Android.
+        # The timeout is a "no network data for this long" safety window,
+        # not a deadline for the whole generation.
+        analysis_timeout = 300.0
 
         client = self.build_client(
             api_key=api_key,
@@ -137,7 +132,7 @@ class AIProvider(ABC):
         )
 
         try:
-            response = client.chat.completions.create(
+            stream = client.chat.completions.create(
                 model=model,
                 messages=[
                     {
@@ -149,14 +144,15 @@ class AIProvider(ABC):
                         "content": user_prompt,
                     },
                 ],
-                stream=False,
+                stream=True,
+            )
+            content, usage = self._consume_chat_stream(
+                stream
             )
         except Exception as exc:
             raise RuntimeError(
                 f"{self.info.name} 分析失败：{exc}"
             ) from exc
-
-        content = response.choices[0].message.content
 
         if not content:
             raise RuntimeError(
@@ -165,7 +161,63 @@ class AIProvider(ABC):
 
         return JsonCallResult(
             data=self._parse_json(content),
-            usage=self._extract_usage(response),
+            usage=usage,
+        )
+
+    @classmethod
+    def _consume_chat_stream(
+        cls,
+        stream,
+    ) -> tuple[str, UsageInfo]:
+        """
+        Consume an OpenAI-compatible Chat Completions SSE stream.
+
+        Works with the official OpenAI Python SDK on desktop and with
+        AndroidOpenAICompat. Reasoning deltas are ignored; only the final
+        answer content is accumulated for JSON parsing.
+        """
+        parts: list[str] = []
+        usage = UsageInfo()
+
+        for chunk in stream:
+            chunk_usage = getattr(
+                chunk,
+                "usage",
+                None,
+            )
+            if chunk_usage is not None:
+                usage = cls._usage_from_value(
+                    chunk_usage
+                )
+
+            choices = getattr(
+                chunk,
+                "choices",
+                None,
+            ) or []
+
+            if not choices:
+                continue
+
+            delta = getattr(
+                choices[0],
+                "delta",
+                None,
+            )
+            if delta is None:
+                continue
+
+            piece = getattr(
+                delta,
+                "content",
+                None,
+            )
+            if isinstance(piece, str):
+                parts.append(piece)
+
+        return (
+            "".join(parts).strip(),
+            usage,
         )
 
     @staticmethod
@@ -205,19 +257,44 @@ class AIProvider(ABC):
 
         return data
 
-    @staticmethod
-    def _extract_usage(response) -> UsageInfo:
-        usage = getattr(response, "usage", None)
+    @classmethod
+    def _extract_usage(
+        cls,
+        response,
+    ) -> UsageInfo:
+        return cls._usage_from_value(
+            getattr(
+                response,
+                "usage",
+                None,
+            )
+        )
 
+    @staticmethod
+    def _usage_from_value(
+        usage,
+    ) -> UsageInfo:
         if usage is None:
             return UsageInfo()
 
         def read(*names):
             for name in names:
-                value = getattr(usage, name, None)
+                value = getattr(
+                    usage,
+                    name,
+                    None,
+                )
 
-                if value is None and isinstance(usage, dict):
-                    value = usage.get(name)
+                if (
+                    value is None
+                    and isinstance(
+                        usage,
+                        dict,
+                    )
+                ):
+                    value = usage.get(
+                        name
+                    )
 
                 if value is not None:
                     try:
@@ -235,7 +312,9 @@ class AIProvider(ABC):
             "output_tokens",
             "completion_tokens",
         )
-        total_tokens = read("total_tokens")
+        total_tokens = read(
+            "total_tokens"
+        )
 
         if total_tokens <= 0:
             total_tokens = (
@@ -244,9 +323,18 @@ class AIProvider(ABC):
             )
 
         return UsageInfo(
-            input_tokens=max(0, input_tokens),
-            output_tokens=max(0, output_tokens),
-            total_tokens=max(0, total_tokens),
+            input_tokens=max(
+                0,
+                input_tokens,
+            ),
+            output_tokens=max(
+                0,
+                output_tokens,
+            ),
+            total_tokens=max(
+                0,
+                total_tokens,
+            ),
         )
 
     def web_research(

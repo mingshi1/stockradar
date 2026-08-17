@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.0-rc4.27
+
+### Android + Windows 长请求流式化
+- DeepSeek 联网研究改为 Responses API SSE 流式传输，Android 与 Windows 使用同一策略。
+- DeepSeek / GLM / Qwen / Kimi / MiniMax 的独立分析和 Judge 改为 Chat Completions SSE 流式传输。
+- Android 自研 OpenAI 兼容层新增 SSE 解析，兼容 `data: [DONE]` 和 Responses 语义事件。
+- 流式连接异常后不自动把整单长推理从头执行，避免多分钟双重等待和潜在重复 API 消耗。
+- DeepSeek 联网研究只有收到 `response.completed` 才视为成功。
+- 保留 RC4.26 Android 自动任务保存控件生命周期修复。
+
+
 ## 1.0.0-rc4.26
 
 ### Android 长请求稳定性

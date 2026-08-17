@@ -273,6 +273,283 @@ class _HttpTransport:
 
                 raise
 
+    def _stream_request_once(
+        self,
+        *,
+        url: str,
+        body: bytes,
+    ):
+        request = urllib.request.Request(
+            url,
+            data=body,
+            method="POST",
+            headers={
+                "Authorization": (
+                    f"Bearer {self.api_key}"
+                ),
+                "Content-Type": (
+                    "application/json"
+                ),
+                "Accept": (
+                    "text/event-stream"
+                ),
+                "Cache-Control": (
+                    "no-cache"
+                ),
+                "Accept-Encoding": (
+                    "identity"
+                ),
+                "Connection": (
+                    "close"
+                ),
+                "User-Agent": (
+                    "StockEventRadar-Android/1.0"
+                ),
+            },
+        )
+
+        with urllib.request.urlopen(
+            request,
+            timeout=self.timeout,
+            context=self.ssl_context,
+        ) as response:
+            event_name = ""
+            data_lines: list[str] = []
+            terminal_seen = False
+
+            while True:
+                raw_line = response.readline()
+
+                if not raw_line:
+                    if data_lines:
+                        data = "\n".join(
+                            data_lines
+                        )
+                        item = self._decode_sse_item(
+                            data,
+                            event_name,
+                        )
+                        if item is not None:
+                            yield item
+
+                    if terminal_seen:
+                        return
+
+                    raise RuntimeError(
+                        "Android SSE 流在完成标记前被关闭。"
+                    )
+
+                line = raw_line.decode(
+                    "utf-8",
+                    errors="replace",
+                ).rstrip(
+                    "\r\n"
+                )
+
+                if line.startswith(":"):
+                    continue
+
+                if line.startswith("event:"):
+                    event_name = (
+                        line[6:].strip()
+                    )
+                    continue
+
+                if line.startswith("data:"):
+                    data_lines.append(
+                        line[5:].lstrip()
+                    )
+                    continue
+
+                if line:
+                    data_lines.append(line)
+                    continue
+
+                if not data_lines:
+                    event_name = ""
+                    continue
+
+                data = "\n".join(
+                    data_lines
+                )
+                data_lines = []
+
+                if data.strip() == "[DONE]":
+                    terminal_seen = True
+                    return
+
+                item = self._decode_sse_item(
+                    data,
+                    event_name,
+                )
+                event_name = ""
+
+                if item is None:
+                    continue
+
+                item_type = str(
+                    item.get("type")
+                    or item.get("event")
+                    or ""
+                )
+
+                if item_type in {
+                    "response.completed",
+                    "response.incomplete",
+                    "response.failed",
+                }:
+                    terminal_seen = True
+
+                yield item
+
+                if terminal_seen:
+                    return
+
+    @staticmethod
+    def _decode_sse_item(
+        data: str,
+        event_name: str,
+    ) -> dict | None:
+        text = data.strip()
+
+        if not text:
+            return None
+
+        try:
+            item = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(
+                "Android SSE 收到无法解析的 JSON 事件。"
+                f"\n\n片段：{text[:500]}"
+            ) from exc
+
+        if not isinstance(
+            item,
+            dict,
+        ):
+            raise RuntimeError(
+                "Android SSE 事件 JSON 顶层不是对象。"
+            )
+
+        if (
+            event_name
+            and not item.get("type")
+        ):
+            item["type"] = event_name
+
+        if (
+            not item.get("type")
+            and isinstance(
+                item.get("event"),
+                str,
+            )
+        ):
+            item["type"] = item["event"]
+
+        return item
+
+    def stream(
+        self,
+        path: str,
+        payload: dict,
+    ):
+        url = (
+            f"{self.base_url}/"
+            f"{path.lstrip('/')}"
+        )
+
+        stream_payload = dict(
+            payload
+        )
+        stream_payload["stream"] = True
+
+        body = json.dumps(
+            stream_payload,
+            ensure_ascii=False,
+        ).encode(
+            "utf-8"
+        )
+
+        try:
+            yield from self._stream_request_once(
+                url=url,
+                body=body,
+            )
+
+        except urllib.error.HTTPError as exc:
+            try:
+                detail = (
+                    exc.read()
+                    .decode(
+                        "utf-8",
+                        errors="replace",
+                    )
+                )
+            except Exception:
+                detail = ""
+
+            diag = key_diagnostic(
+                self.api_key
+            )
+
+            raise RuntimeError(
+                f"HTTP {exc.code}："
+                f"{detail[:1200] or exc.reason}"
+                f"\n\nKey诊断：{diag.compact()}"
+            ) from exc
+
+        except urllib.error.URLError as exc:
+            reason = exc.reason
+
+            if isinstance(
+                reason,
+                ssl.SSLCertVerificationError,
+            ):
+                raise RuntimeError(
+                    "TLS 证书校验失败。"
+                    "请检查代理/VPN/HTTPS 过滤，"
+                    "或切换网络后重试。"
+                    f"\n\n详细信息：{reason}"
+                ) from exc
+
+            raise RuntimeError(
+                "Android SSE 网络连接失败。"
+                "流式请求不会自动整单重试，"
+                "以避免重复执行长推理/API 消耗。"
+                f"\n\n详细信息：{reason}"
+            ) from exc
+
+        except (
+            socket.timeout,
+            TimeoutError,
+        ) as exc:
+            raise RuntimeError(
+                "Android SSE 等待后续数据超时。"
+                f"连续约 {int(self.timeout)} 秒未收到网络数据。"
+                "如果服务端正常发送 token 或 keep-alive，"
+                "长任务本身可以超过这个时长。"
+                f"\n\n详细信息：{exc}"
+            ) from exc
+
+        except (
+            http.client.IncompleteRead,
+            http.client.RemoteDisconnected,
+            ConnectionResetError,
+        ) as exc:
+            raise RuntimeError(
+                "Android SSE 连接在完成事件前被关闭。"
+                "本次不会自动从头重跑，避免重复调用。"
+                f"\n\n详细信息：{exc}"
+            ) from exc
+
+        except ssl.SSLCertVerificationError as exc:
+            raise RuntimeError(
+                "TLS 证书校验失败。"
+                "请检查代理/VPN/HTTPS 过滤，"
+                "或切换网络后重试。"
+                f"\n\n详细信息：{exc}"
+            ) from exc
+
     def post(
         self,
         path: str,
@@ -479,6 +756,17 @@ class _ChatCompletions:
         self,
         **kwargs,
     ):
+        if kwargs.get(
+            "stream"
+        ):
+            return (
+                _to_namespace(item)
+                for item in self.transport.stream(
+                    "/chat/completions",
+                    kwargs,
+                )
+            )
+
         data = (
             self.transport.post(
                 "/chat/completions",
@@ -516,6 +804,17 @@ class _Responses:
         self,
         **kwargs,
     ):
+        if kwargs.get(
+            "stream"
+        ):
+            return (
+                _to_namespace(item)
+                for item in self.transport.stream(
+                    "/responses",
+                    kwargs,
+                )
+            )
+
         data = (
             self.transport.post(
                 "/responses",
